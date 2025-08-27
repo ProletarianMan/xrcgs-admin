@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.xrcgs</groupId>
+    <artifactId>xrcgs-admin</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>xrcgs-admin</name>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <spring-boot.version>3.4.0</spring-boot.version>
+        <mybatis-plus.version>3.5.6</mybatis-plus.version>
+        <jjwt.version>0.11.5</jjwt.version>
+        <hutool.version>5.8.28</hutool.version>
+        <jodconverter.version>4.4.6</jodconverter.version>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <modules>
+        <module>xrcgs-common</module>
+        <module>xrcgs-infrastructure</module>
+        <module>xrcgs-module-auth</module>
+        <module>xrcgs-module-iam</module>
+        <module>xrcgs-module-syslog</module>
+        <module>xrcgs-module-file</module>
+        <module>xrcgs-module-workflow</module>
+        <module>xrcgs-boot</module>
+        <module>xrcgs-common</module>
+        <module>xrcgs-infrastructure</module>
+        <module>xrcgs-module-auth</module>
+        <module>xrcgs-module-iam</module>
+        <module>xrcgs-module-syslog</module>
+        <module>xrcgs-module-file</module>
+        <module>xrcgs-module-workflow</module>
+        <module>xrcgs-boot</module>
+    </modules>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <release>${maven.compiler.release}</release>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+</project>
