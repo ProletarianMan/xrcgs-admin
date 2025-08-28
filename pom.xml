@@ -36,6 +36,7 @@
     </dependencyManagement>
 
     <modules>
+        <module>xrcgs-boot</module>
         <module>xrcgs-common</module>
         <module>xrcgs-infrastructure</module>
         <module>xrcgs-module-auth</module>
@@ -43,7 +44,6 @@
         <module>xrcgs-module-syslog</module>
         <module>xrcgs-module-file</module>
         <module>xrcgs-module-workflow</module>
-        <module>xrcgs-boot</module>
     </modules>
 
     <build>

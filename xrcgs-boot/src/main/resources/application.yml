@@ -5,6 +5,22 @@ spring:
   application:
     name: xrcgs-admin
 
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/xrcgs_admin?useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: 111
+    password: 111
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      password: 111
+
 #Actuator确认服务在线设置
 management:
   endpoints:
@@ -14,3 +30,12 @@ management:
   endpoint:
     health:
       show-details: "never"
+
+jwt:
+  # 至少 64 位长度（建议 Base64 随机串，示例仅演示）
+  secret: "xrcgs-THIS_IS_A_DEMO_SECRET_PLEASE_REPLACE_WITH_A_RANDOM_64+_CHARS_STRING_2025_xrcgs_xrcgs_xrcgs"
+  issuer: "xrcgs"
+  access-ttl-seconds: 3600       # 1h
+  refresh-ttl-seconds: 604800    # 7d
+  header: "Authorization"
+  prefix: "Bearer "

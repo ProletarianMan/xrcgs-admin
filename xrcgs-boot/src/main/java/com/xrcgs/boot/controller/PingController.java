@@ -11,7 +11,7 @@ import java.util.Map;
 @RestController
 public class PingController {
 
-    @GetMapping("/api/test/ping")
+    @GetMapping("/api/ping")
     public Map<String, Object> ping() {
         return Map.of("code", 0, "msg", "OK");
     }
