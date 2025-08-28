@@ -15,3 +15,15 @@ syslog:
   enabled: true
   maxBodyLength: 2048
   logResult: true
+  cleanup:
+    enabled: true
+    retention-days: 30
+    cron: 0 30 3 * * ?
+    batch-size: 0 # 或者 5000，取决于你的数据量
+
+
+
+
+#    retentionDays: 0   # ← 现在之前的所有记录都视为过期（用于测试）
+#    cron: "*/30 * * * * ?"  # ← 每 30 秒跑一次，验证后改回去
+#    batchSize: 1000

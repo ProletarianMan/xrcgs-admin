@@ -17,3 +17,9 @@ syslog:
   enabled: true
   maxBodyLength: 2048
   logResult: false
+  cleanup:
+    enabled: true
+    #暂时按开发环境来，等稳定或有法律风险后开启180天，5000条批删除
+    retention-days: 30
+    cron: 0 30 3 * * ?
+    batch-size: 500 # 或者 5000，取决于你的数据量
