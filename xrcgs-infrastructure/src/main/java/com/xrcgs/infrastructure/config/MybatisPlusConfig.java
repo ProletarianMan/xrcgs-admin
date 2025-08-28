@@ -11,13 +11,6 @@ import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGe
  * 配置MybatisPlus
  */
 @Configuration
-@MapperScan(
-        basePackages = {
-                "com.xrcgs.iam.mapper",   // 你原有 IAM 模块的 mapper
-                "com.xrcgs.auth.user"     // 新增 auth 模块里的 SysUserMapper 包
-        },
-        nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class
-)
 public class MybatisPlusConfig {
 
     @Bean
