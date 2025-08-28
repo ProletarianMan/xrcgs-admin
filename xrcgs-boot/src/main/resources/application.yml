@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: xrcgs-admin
+  # 用 profile 组的方式：激活 dev ≡ 同时激活 dev 和 local
+  profiles:
+    group:
+      dev: [dev, local]
+      prod: [prod]
 
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/xrcgs_admin?useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai
@@ -48,8 +53,3 @@ jwt:
   refresh-ttl-seconds: 604800    # 7d
   header: "Authorization"
   prefix: "Bearer "
-
-syslog:
-  enabled: true
-  maxBodyLength: 2048
-  logResult: true

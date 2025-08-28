@@ -1,0 +1,19 @@
+spring:
+  profiles:
+    include: local  # ⭐ 激活 dev 时，会额外加载 application-local.yml
+  datasource:
+    url: jdbc:mysql://localhost:3306/xrcgs_admin?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: ${DB_USER}
+    password: ${DB_PASS}
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      password: ${RD_PASS}
+
+syslog:
+  enabled: true
+  maxBodyLength: 2048
+  logResult: false

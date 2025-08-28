@@ -1,15 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
-
-    <!-- 读取 Spring Profile -->
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="xrcgs"/>
     <property name="LOG_PATH" value="logs/${APP_NAME}"/>
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] traceId=%X{traceId:-} %logger - %msg%n"/>
 
-    <!-- 输出格式：时间 级别 线程 traceId logger - msg -->
-    <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] traceId=%X{traceId:-} %logger - %msg%n"/>
-
-    <!-- ============ DEV：控制台彩色 ============ -->
+    <!-- ===== DEV：控制台，root=INFO ===== -->
     <springProfile name="dev">
         <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
@@ -18,13 +13,16 @@
             </encoder>
         </appender>
 
-        <logger name="com.xrcgs" level="DEBUG"/>
+        <!-- 项目包建议维持 INFO，过多 DEBUG 容易刷屏；需要时临时升 DEBUG -->
+        <logger name="com.xrcgs" level="INFO"/>
+
+        <!-- ⭐ 要求：开发环境 root 设为 INFO -->
         <root level="INFO">
             <appender-ref ref="STDOUT"/>
         </root>
     </springProfile>
 
-    <!-- ============ PROD：按天滚动文件，保留 30 天 ============ -->
+    <!-- ===== PROD：文件滚动，root=ERROR ===== -->
     <springProfile name="prod">
         <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>${LOG_PATH}/app.log</file>
@@ -39,52 +37,12 @@
             </rollingPolicy>
         </appender>
 
-        <logger name="com.xrcgs" level="INFO"/>
-        <root level="INFO">
+        <!-- 生产包级别也随 root 降噪；需要更细粒度时再单独加 -->
+        <logger name="com.xrcgs" level="ERROR"/>
+
+        <!-- ⭐ 要求：生产环境 root 设为 ERROR -->
+        <root level="ERROR">
             <appender-ref ref="FILE"/>
         </root>
     </springProfile>
-
-    <!-- 本地测试 -->
-    <springProfile name="local">
-        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) [%thread] traceId=%X{traceId:-} %cyan(%logger{36}) - %msg%n</pattern>
-                <charset>UTF-8</charset>
-            </encoder>
-        </appender>
-
-        <logger name="com.xrcgs" level="DEBUG"/>
-        <root level="INFO">
-            <appender-ref ref="STDOUT"/>
-        </root>
-    </springProfile>
-
-    <!-- ============ 可选：JSON Log（logstash-encoder） ============
-    使用方法：
-    1) 在 boot（或父）POM 添加依赖：
-       <dependency>
-         <groupId>net.logstash.logback</groupId>
-         <artifactId>logstash-logback-encoder</artifactId>
-         <version>7.4</version>
-       </dependency>
-    2) 把上面的 encoder 替换为：
-       <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-         <providers>
-           <timestamp/>
-           <pattern>
-             <pattern>
-               {
-                 "level":"%level",
-                 "thread":"%thread",
-                 "logger":"%logger",
-                 "traceId":"%X{traceId:-}",
-                 "message":"%message"
-               }
-             </pattern>
-           </pattern>
-           <stackTrace/>
-         </providers>
-       </encoder>
-    ============================================================ -->
 </configuration>

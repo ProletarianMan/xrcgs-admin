@@ -6,6 +6,7 @@ import com.xrcgs.syslog.service.SysOpLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
@@ -18,6 +19,7 @@ public class SystemErrorLogListener {
 
     private final SysOpLogService opLogService;
 
+    @Async
     @Order(100)
     @EventListener(SystemErrorEvent.class)
     public void onError(SystemErrorEvent e) {
