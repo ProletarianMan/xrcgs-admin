@@ -12,11 +12,12 @@
     <artifactId>xrcgs-common</artifactId>
     <name>xrcgs-common</name>
 
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
 
     <dependencies>
-        <!-- 暂时不加依赖，后续逐步填充 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>

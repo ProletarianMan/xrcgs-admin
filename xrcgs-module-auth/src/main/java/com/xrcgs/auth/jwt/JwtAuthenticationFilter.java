@@ -78,6 +78,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (JwtException | IllegalArgumentException e) {
             unauthorized(response, "无效令牌");
         }
+
+//        chain.doFilter(request, response);
     }
 
     private void unauthorized(HttpServletResponse response, String message) throws IOException {

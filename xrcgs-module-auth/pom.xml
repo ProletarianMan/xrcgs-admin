@@ -90,5 +90,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- 其他依赖 -->
+        <dependency>
+            <groupId>com.xrcgs</groupId>
+            <artifactId>xrcgs-module-syslog</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>

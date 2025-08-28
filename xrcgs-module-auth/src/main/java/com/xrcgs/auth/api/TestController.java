@@ -6,6 +6,7 @@ import com.xrcgs.auth.user.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.xrcgs.syslog.annotation.OpLog;
 
 import java.util.Map;
 
@@ -30,5 +31,22 @@ public class TestController {
                 "nickname", u != null ? u.getNickname() : username,
                 "authorities", authentication.getAuthorities()
         );
+    }
+
+    /**
+     * 日志测试接口
+     * @param authentication
+     * @param boom
+     * @return
+     */
+    @GetMapping("/sysLog")
+    @OpLog("查询当前用户")
+    public Object sysLog(Authentication authentication,
+                     @RequestParam(value = "boom", required = false, defaultValue = "false") boolean boom) {
+        if (boom) {
+            // 用于演示失败日志（测试后可删掉）
+            throw new IllegalArgumentException("演示异常：boom");
+        }
+        return authentication == null ? null : authentication.getPrincipal();
     }
 }

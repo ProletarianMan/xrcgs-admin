@@ -21,6 +21,15 @@ spring:
       database: 0
       password: 111
 
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+logging:
+  level:
+    com.xrcgs.syslog.mapper: debug
+
+
 #Actuator确认服务在线设置
 management:
   endpoints:
@@ -39,3 +48,8 @@ jwt:
   refresh-ttl-seconds: 604800    # 7d
   header: "Authorization"
   prefix: "Bearer "
+
+syslog:
+  enabled: true
+  maxBodyLength: 2048
+  logResult: true
