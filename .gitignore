@@ -56,3 +56,6 @@ out/
 
 # Local config
 application-local.yml
+
+# static source
+/data

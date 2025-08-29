@@ -54,6 +54,13 @@
             <artifactId>xrcgs-module-auth</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!-- 文件处理功能 -->
+        <dependency>
+            <groupId>com.xrcgs</groupId>
+            <artifactId>xrcgs-module-file</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

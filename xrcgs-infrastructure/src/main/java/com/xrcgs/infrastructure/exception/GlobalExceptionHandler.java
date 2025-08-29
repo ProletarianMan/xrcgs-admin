@@ -1,76 +1,72 @@
 package com.xrcgs.infrastructure.exception;
 
-import com.xrcgs.common.event.SystemErrorEvent;
-import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.xrcgs.common.core.R;
+import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 /**
- * 全局异常处理：发布 SystemErrorEvent，避免二次抛出。
- * 这里不用 Lombok，避免 IDE 未开启注解处理导致“变量未初始化”。
+ * 全局异常处理（唯一实例）
+ * 说明：放在 infrastructure 里，所有模块共用，避免重复定义。
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    private final ApplicationEventPublisher publisher;
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public R<Void> handleMissingParam(MissingServletRequestParameterException e) {
+        return R.fail(400, "缺少必填参数：" + e.getParameterName());
+    }
 
-    @Autowired
-    public GlobalExceptionHandler(ApplicationEventPublisher publisher) {
-        this.publisher = publisher; // <- 这样就不会提示“might not have been initialized”
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public R<Void> handleMethodArgumentNotValid(MethodArgumentNotValidException e) {
+        var fieldError = e.getBindingResult().getFieldError();
+        String msg = fieldError != null ? fieldError.getField() + " " + fieldError.getDefaultMessage() : "参数校验失败";
+        return R.fail(400, msg);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public R<Void> handleConstraintViolation(ConstraintViolationException e) {
+        return R.fail(400, "参数校验失败：" + e.getMessage());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public R<Void> handleNotReadable(HttpMessageNotReadableException e) {
+        return R.fail(400, "请求体解析失败");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public R<Void> handleAccessDenied(AccessDeniedException e) {
+        return R.fail(403, "无权访问");
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public R<Void> handleIllegalArgument(IllegalArgumentException e) {
+        return R.fail(400, e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public Object handleAll(Exception ex, HttpServletRequest request) {
-        String httpMethod = safe(() -> request.getMethod());
-        String uri = safe(() -> request.getRequestURI());
-        String query = safe(() -> request.getQueryString());
-        String ip = clientIp(request);
-
-        String username = currentUsername();
-
-        String exMsg = ex.getClass().getSimpleName() + ": " + (ex.getMessage() == null ? "" : ex.getMessage());
-        if (exMsg.length() > 1000) exMsg = exMsg.substring(0, 1000) + "...(truncated)";
-
-        // 发布事件（由 syslog 模块的监听器入库）
-        publisher.publishEvent(new SystemErrorEvent(this, "系统异常", username,
-                httpMethod, uri, ip, query, exMsg));
-
-        // 这里返回你项目统一的错误响应结构（示例）
-        return new ErrorResponse(500, "INTERNAL_ERROR", "服务器错误");
+    public R<Void> handleOther(Exception e) {
+        // 生产环境可以隐藏具体异常信息；这里返回统一提示
+        log.error(e.getMessage(), e);
+        return R.fail(500, "服务器开小差了");
     }
 
-    // —— 工具方法 —— //
-    private static String clientIp(HttpServletRequest request) {
-        if (request == null) return null;
-        String[] headers = { "X-Forwarded-For", "X-Real-IP", "Proxy-Client-IP", "WL-Proxy-Client-IP" };
-        for (String h : headers) {
-            String v = request.getHeader(h);
-            if (v != null && !v.isBlank() && !"unknown".equalsIgnoreCase(v)) {
-                int idx = v.indexOf(',');
-                return idx > 0 ? v.substring(0, idx).trim() : v.trim();
-            }
-        }
-        return request.getRemoteAddr();
+    @ExceptionHandler({MaxUploadSizeExceededException.class})
+    public R<Void> handleMaxUpload(org.springframework.web.multipart.MaxUploadSizeExceededException e) {
+        return R.fail(413, "上传文件过大，请压缩或分批上传");
     }
 
-    private static String currentUsername() {
-        try {
-            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            return (auth != null) ? auth.getName() : "anonymous";
-        } catch (Exception ignored) {
-            return "anonymous";
-        }
+    @ExceptionHandler({MultipartException.class})
+    public R<Void> handleMultipart(MultipartException e) {
+        // 兜底处理各种 multipart 解析异常
+        return R.fail(400, "上传解析失败：" + e.getMessage());
     }
-
-    private static <T> T safe(SupplierEx<T> s) {
-        try { return s.get(); } catch (Exception e) { return null; }
-    }
-    private interface SupplierEx<T> { T get() throws Exception; }
-
-    // —— 你的统一错误返回体（示例，可替换为现有类） —— //
-    private record ErrorResponse(int code, String error, String message) {}
 }

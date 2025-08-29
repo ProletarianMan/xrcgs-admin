@@ -45,6 +45,20 @@
             <artifactId>mysql-connector-j</artifactId>
         </dependency>
 
+        <!-- jodconverter 本地转换 -->
+        <dependency>
+            <groupId>org.jodconverter</groupId>
+            <artifactId>jodconverter-local</artifactId>
+            <version>${jodconverter.version}</version>
+        </dependency>
+
+        <!-- Hibernate Validator 依赖 -->
+        <dependency>
+            <groupId>org.hibernate.validator</groupId>
+            <artifactId>hibernate-validator</artifactId>
+        </dependency>
+
+
         <!-- 事件类来自 common -->
         <dependency>
             <groupId>com.xrcgs</groupId>

@@ -19,8 +19,8 @@
         <spring-boot.version>3.4.7</spring-boot.version>
         <mybatis-plus.version>3.5.6</mybatis-plus.version>
         <jjwt.version>0.11.5</jjwt.version>
-        <hutool.version>5.8.28</hutool.version>
-        <jodconverter.version>4.4.6</jodconverter.version>
+        <hutool.version>5.8.31</hutool.version>
+        <jodconverter.version>4.4.8</jodconverter.version>
     </properties>
 
     <dependencyManagement>
@@ -55,6 +55,11 @@
                     <version>3.11.0</version>
                     <configuration>
                         <release>${java.release}</release>
+                        <source>21</source>
+                        <target>21</target>
+                        <compilerArgs>
+                            <arg>-parameters</arg>
+                        </compilerArgs>
                     </configuration>
                 </plugin>
             </plugins>

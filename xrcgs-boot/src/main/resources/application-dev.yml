@@ -3,6 +3,10 @@ spring:
     url: jdbc:mysql://localhost:3306/xrcgs_admin?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${DB_USER:root}
     password: ${DB_PASS:root}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   data:
     redis:
@@ -21,9 +25,25 @@ syslog:
     cron: 0 30 3 * * ?
     batch-size: 0 # 或者 5000，取决于你的数据量
 
-
-
-
 #    retentionDays: 0   # ← 现在之前的所有记录都视为过期（用于测试）
 #    cron: "*/30 * * * * ?"  # ← 每 30 秒跑一次，验证后改回去
 #    batchSize: 1000
+
+file:
+  storage-root: data/uploads  #存储地址
+  preview-root: data/preview  #预览地址
+  max-size: 1073741824  # 文件校验最大1GB
+  preview-auth-required: false   #预览权限验证
+
+  # 可选：扩/改白名单（默认已内置常用类型）
+  # allowed-exts: [jpg,jpeg,png,webp,gif,doc,docx,xls,xlsx,ppt,pptx,pdf,mp4,mp3]
+  # allowed-mimes: [image/,application/pdf,video/,audio/,application/vnd.openxmlformats-officedocument.wordprocessingml.document]
+
+# 转换相关
+convert:
+  timeout-ms: 300000  #5分钟
+  pool-size: 2
+
+# LibreOffice 安装路径（如放空则按系统默认）
+libreoffice:
+  home: ""    # Linux: /opt/libreoffice7.6 ；Windows: C:\Program Files\LibreOffice\program\soffice.exe 的上级目录

@@ -1,10 +1,12 @@
 spring:
-  profiles:
-    include: local  # ⭐ 激活 dev 时，会额外加载 application-local.yml
   datasource:
     url: jdbc:mysql://localhost:3306/xrcgs_admin?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
     username: ${DB_USER}
     password: ${DB_PASS}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 1
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   data:
     redis:
@@ -23,3 +25,7 @@ syslog:
     retention-days: 30
     cron: 0 30 3 * * ?
     batch-size: 500 # 或者 5000，取决于你的数据量
+
+logging:
+  level:
+    com.xrcgs.syslog.mapper: error
