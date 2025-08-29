@@ -18,4 +18,7 @@ public class FileVO {
     private Long size;
     private String originalName; // 原文件名称
     private String status;
+
+    /** 新增：是否复用了已存在的文件（true=未落盘未入库） */
+    private Boolean reused;
 }

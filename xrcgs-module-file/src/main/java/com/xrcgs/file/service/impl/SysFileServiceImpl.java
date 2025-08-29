@@ -15,11 +15,14 @@ import com.xrcgs.file.storage.FileStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
@@ -44,12 +47,14 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
      * @param userId 用户Id
      * @return 文件属性
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public List<FileVO> upload(List<MultipartFile> files, String bizType, Long userId) {
         if (files == null || files.isEmpty()) {
             throw new IllegalArgumentException("没有上传文件");
         }
+
+        // 校验业务类型
         if (props.getBizTypeWhitelist() != null && !props.getBizTypeWhitelist().isEmpty()) {
             if (!props.getBizTypeWhitelist().contains(bizType)) {
                 throw new IllegalArgumentException("不被允许的业务类型: " + bizType);
@@ -58,43 +63,69 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         String traceId = Optional.ofNullable(MDC.get("traceId")).orElse("-");
         List<FileVO> result = new ArrayList<>();
         for (MultipartFile f : files) {
-            try {
-                var saved = storage.save(f, bizType);
-                SysFile ent = new SysFile();
-                ent.setBizType(bizType);
-                ent.setFileType(saved.getFileType().name());
-                ent.setOriginalName(f.getOriginalFilename());
-                ent.setExt(saved.getExt());
-                ent.setMime(saved.getMime());
-                ent.setSize(saved.getSize());
-                ent.setSha256(saved.getSha256());
-                ent.setStoragePath(saved.getStorageRelativePath());
-                ent.setStatus(FileStatus.UPLOADED.name());
-                ent.setCreatedAt(LocalDateTime.now());
-                ent.setCreatedBy(userId);
-
-                this.save(ent);
-
-                String url = "/api/file/download/" + ent.getId();
-                String pv = ent.getPreviewPath() != null ? "/api/file/preview/" + ent.getId() : null;
-                result.add(FileVO.builder()
-                        .id(ent.getId())
-                        .url(url)
-                        .previewUrl(pv)
-                        .fileType(ent.getFileType())
-                        .bizType(ent.getBizType())
-                        .mime(ent.getMime())
-                        .size(ent.getSize())
-                        .originalName(ent.getOriginalName())
-                        .status(ent.getStatus())
-                        .build());
-
-                log.info("上传成功 traceId={} id={} path={}", traceId, ent.getId(), ent.getStoragePath());
-            } catch (Exception ex) {
-                String msg = cut(ex.getMessage(), 2000);
-                log.error("上传失败 traceId={} err={}", traceId, msg, ex);
-                throw new RuntimeException("文件上传失败: " + msg);
+            // 1) 先计算 sha256（不加载全量到内存）
+            String sha256;
+            try (InputStream in = f.getInputStream()) {
+                sha256 = com.xrcgs.file.util.DigestUtils.sha256Hex(in);
+            } catch (Exception e) {
+                throw new RuntimeException("sha256 校验失败", e);
             }
+
+            // 2) 查是否已有（未删除）的记录
+            SysFile existed = this.getOne(new LambdaQueryWrapper<SysFile>()
+                    .eq(SysFile::getSha256, sha256)
+                    .ne(SysFile::getStatus, FileStatus.DELETED.name())
+                    .last("limit 1"));
+
+            if (existed != null) {
+                // 2.1 已存在：不落盘，直接返回旧记录的属性
+                result.add(toVO(existed, true));
+                continue;
+            }
+
+
+            // 3) 不存在：正常保存 + 入库（仍需做 MIME/后缀白名单校验，LocalFileStorage.save 内部已有）
+            FileStorage.SaveResult saved;
+            try {
+                saved = storage.save(f, bizType);
+            } catch (IOException e) {
+                throw new RuntimeException("文件入库失败: " + f.getOriginalFilename(), e);
+            }
+
+            // 组件文件实体
+            SysFile ent = new SysFile();
+            ent.setBizType(bizType);
+            ent.setFileType(saved.getFileType().name());
+            ent.setOriginalName(f.getOriginalFilename());
+            ent.setExt(saved.getExt());
+            ent.setMime(saved.getMime());
+            ent.setSize(saved.getSize());
+            ent.setSha256(saved.getSha256());
+            ent.setStoragePath(saved.getStorageRelativePath());
+            ent.setStatus(FileStatus.UPLOADED.name());
+
+
+            try {
+                this.save(ent);
+            } catch (DuplicateKeyException dke) {
+                // 3.1 并发场景：别的请求刚好插入了同 sha256；此时回查并复用
+                SysFile concurrent = this.getOne(new LambdaQueryWrapper<SysFile>()
+                        .eq(SysFile::getSha256, sha256)
+                        .ne(SysFile::getStatus, FileStatus.DELETED.name())
+                        .last("limit 1"));
+
+                if (concurrent != null) {
+                    result.add(toVO(concurrent, true));
+                    // 可选：删除刚刚写入的物理文件（因为没入库成功）；但一般 CREATE_NEW 打开，插不进去就没写到磁盘
+                    continue;
+                }
+                // 抛出
+                throw dke;
+            }
+
+            result.add(toVO(ent, false));
+            log.info("上传成功 traceId={} id={} path={}", traceId, ent.getId(), ent.getStoragePath());
+
         }
         return result;
     }
@@ -190,5 +221,30 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
     private String cut(String s, int max) {
         if (s == null) return null;
         return s.length() > max ? s.substring(0, max) : s;
+    }
+
+
+    /**
+     * 实体类转传输类型
+     * @param f
+     * @param reused
+     * @return
+     */
+    private FileVO toVO(SysFile f, boolean reused) {
+        String url = "/api/file/download/" + f.getId();
+        String pv = f.getPreviewPath() != null ? "/api/file/preview/" + f.getId() : null;
+
+        return FileVO.builder()
+                .id(f.getId())
+                .url(url)
+                .previewUrl(pv)
+                .fileType(f.getFileType())
+                .bizType(f.getBizType())
+                .mime(f.getMime())
+                .size(f.getSize())
+                .originalName(f.getOriginalName())
+                .status(f.getStatus())
+                .reused(reused)
+                .build();
     }
 }

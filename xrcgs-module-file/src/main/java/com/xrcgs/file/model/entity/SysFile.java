@@ -34,5 +34,6 @@ public class SysFile {
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
+    @TableField(fill = FieldFill.INSERT) // ★ 新增：启用自动填充
     private Long createdBy;
 }
