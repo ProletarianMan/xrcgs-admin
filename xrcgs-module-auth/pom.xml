@@ -97,5 +97,11 @@
             <artifactId>xrcgs-module-syslog</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.xrcgs</groupId>
+            <artifactId>xrcgs-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 </project>
