@@ -5,6 +5,11 @@ import com.xrcgs.auth.api.dto.AuthDtos.*;
 import com.xrcgs.auth.jwt.*;
 import com.xrcgs.auth.user.SysUser;
 import com.xrcgs.auth.user.SysUserMapper;
+import com.xrcgs.iam.entity.SysRole;
+import com.xrcgs.iam.entity.SysUserRole;
+import com.xrcgs.iam.mapper.SysRoleMapper;
+import com.xrcgs.iam.mapper.SysUserRoleMapper;
+import com.xrcgs.iam.service.PermService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +21,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 权限认证控制器
@@ -30,6 +37,9 @@ public class AuthController {
     private final JwtProperties props;
     private final TokenBlacklistService blacklistService;
     private final SysUserMapper userMapper;
+    private final SysUserRoleMapper userRoleMapper;
+    private final SysRoleMapper roleMapper;
+    private final PermService permService;
     private final PasswordEncoder passwordEncoder; // 仅供调试/导入使用，可删
 
     /** 登入 */
@@ -45,15 +55,32 @@ public class AuthController {
 
         String nickname = db != null ? db.getNickname() : principal.getUsername();
 
-        String access = jwtUtil.generateAccessToken(principal.getUsername(), nickname, List.of("ROLE_USER"));
+        // 1) 取用户角色ID集
+        assert db != null;
+        Set<Long> roleIds = userRoleMapper.selectList(
+                        Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, db.getId()))
+                .stream().map(SysUserRole::getRoleId).collect(Collectors.toSet());
+
+        // 2) 角色编码 -> ["ADMIN", "OPS", ...]
+        List<String> roleCodes = roleMapper.selectBatchIds(roleIds).stream()
+                .map(SysRole::getCode).toList();
+
+        // 3) 聚合权限并缓存（调用 iam 的 PermService；7-3 已实现）
+        Set<String> perms = permService.loadAndCacheUserPerms(db.getId());
+
+        // 4) token生成
+        String access = jwtUtil.generateAccessToken(principal.getUsername(), nickname, roleCodes, perms);
         String refresh = jwtUtil.generateRefreshToken(principal.getUsername());
 
+        // 返回前端需要的内容
         return ResponseEntity.ok(LoginResponse.builder()
                 .username(principal.getUsername())
                 .nickname(nickname)
                 .token(access)
                 .refreshToken(refresh)
                 .expiresIn(props.getAccessTtlSeconds())
+                .roles(roleCodes)
+                .permissions(perms)
                 .build());
     }
 
@@ -102,7 +129,21 @@ public class AuthController {
             return ResponseEntity.status(401).build();
         }
 
-        String newAccess = jwtUtil.generateAccessToken(username, db.getNickname(), List.of("ROLE_USER"));
+        // 1) 取用户角色ID集
+        assert db != null;
+        Set<Long> roleIds = userRoleMapper.selectList(
+                        Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, db.getId()))
+                .stream().map(SysUserRole::getRoleId).collect(Collectors.toSet());
+
+        // 2) 角色编码 -> ["ADMIN", "OPS", ...]
+        List<String> roleCodes = roleMapper.selectBatchIds(roleIds).stream()
+                .map(SysRole::getCode).toList();
+
+        // 3) 聚合权限并缓存（调用 iam 的 PermService；7-3 已实现）
+        Set<String> perms = permService.loadAndCacheUserPerms(db.getId());
+
+        // 生成新Token
+        String newAccess = jwtUtil.generateAccessToken(username, db.getNickname(), roleCodes, perms);
         return ResponseEntity.ok(TokenResponse.builder()
                 .token(newAccess)
                 .expiresIn(props.getAccessTtlSeconds())

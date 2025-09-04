@@ -3,7 +3,9 @@ package com.xrcgs.auth.api.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 权限响应对象
@@ -23,6 +25,8 @@ public class AuthDtos {
         private String token;         // access token
         private String refreshToken;
         private long   expiresIn;     // seconds
+        private List<String> roles;  // 角色权限
+        private Set<String> permissions; // 当前登录用户的按钮级别权限
     }
 
     @Data
