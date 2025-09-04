@@ -38,7 +38,7 @@ jwt:
   # 至少 64 位长度（建议 Base64 随机串，示例仅演示）
   secret: "xrcgs-THIS_IS_A_DEMO_SECRET_PLEASE_REPLACE_WITH_A_RANDOM_64+_CHARS_STRING_2025_xrcgs_xrcgs_xrcgs"
   issuer: "xrcgs"
-  access-ttl-seconds: 3600       # 1h
+  access-ttl-seconds: 28800       # 8h
   refresh-ttl-seconds: 604800    # 7d
   header: "Authorization"
   prefix: "Bearer "

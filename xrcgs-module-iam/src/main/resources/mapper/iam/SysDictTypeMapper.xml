@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xrcgs.iam.mapper.SysDictTypeMapper">
+
+    <select id="selectPage" resultType="com.xrcgs.iam.entity.SysDictType">
+        SELECT id, code, name, status, remark, create_time AS createTime, update_time AS updateTime
+        FROM sys_dict_type
+        WHERE 1 = 1
+        <if test="q != null">
+            <if test="q.keyword != null and q.keyword != ''">
+                AND (code LIKE CONCAT('%', #{q.keyword}, '%')
+                OR name LIKE CONCAT('%', #{q.keyword}, '%'))
+            </if>
+            <if test="q.status != null">
+                AND status = #{q.status}
+            </if>
+            <if test="q.startTime != null">
+                AND create_time &gt;= #{q.startTime}
+            </if>
+            <if test="q.endTime != null">
+                AND create_time &lt;= #{q.endTime}
+            </if>
+        </if>
+        ORDER BY id DESC
+    </select>
+
+</mapper>

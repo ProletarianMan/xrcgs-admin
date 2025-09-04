@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xrcgs.iam.mapper.SysMenuMapper">
+
+    <resultMap id="MenuMap" type="com.xrcgs.iam.entity.SysMenu">
+        <id     property="id"        column="id"/>
+        <result property="parentId"  column="parent_id"/>
+        <result property="name"      column="name"/>
+        <result property="path"      column="path"/>
+        <result property="component" column="component"/>
+        <result property="type"      column="type"/>
+        <result property="perms"     column="perms"/>
+        <result property="icon"      column="icon"/>
+        <result property="orderNo"   column="order_no"/>
+        <result property="visible"   column="visible"/>
+        <result property="status"    column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag"   column="del_flag"/>
+    </resultMap>
+
+    <select id="selectListByQuery" resultMap="MenuMap">
+        SELECT * FROM sys_menu
+        WHERE del_flag = 0
+        <if test="q != null">
+            <if test="q.keyword != null and q.keyword != ''">
+                AND (name LIKE CONCAT('%', #{q.keyword}, '%')
+                OR path LIKE CONCAT('%', #{q.keyword}, '%')
+                OR perms LIKE CONCAT('%', #{q.keyword}, '%'))
+            </if>
+            <if test="q.status != null">
+                AND status = #{q.status}
+            </if>
+            <if test="q.type != null">
+                AND type = #{q.type}
+            </if>
+            <if test="q.parentId != null">
+                AND parent_id = #{q.parentId}
+            </if>
+            <if test="q.visible != null">
+                AND visible = #{q.visible}
+            </if>
+        </if>
+        ORDER BY order_no ASC, id ASC
+    </select>
+
+    <!-- 通过角色查菜单（基于角色-菜单表） -->
+    <select id="selectByRoleId" resultMap="MenuMap">
+        SELECT m.* FROM sys_menu m
+                            INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        WHERE rm.role_id = #{roleId} AND m.del_flag = 0
+        ORDER BY m.order_no ASC, m.id ASC
+    </select>
+
+</mapper>

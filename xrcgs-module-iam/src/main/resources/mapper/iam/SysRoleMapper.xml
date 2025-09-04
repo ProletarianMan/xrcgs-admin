@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xrcgs.iam.mapper.SysRoleMapper">
+
+    <select id="selectPage" resultType="com.xrcgs.iam.entity.SysRole">
+        SELECT
+        id, code, name, status, data_scope AS dataScope, data_scope_ext AS dataScopeExt,
+        remark, sort_no AS sortNo, create_by AS createBy, create_time AS createTime,
+        update_by AS updateBy, update_time AS updateTime, del_flag AS delFlag
+        FROM sys_role
+        WHERE del_flag = 0
+        <if test="q != null">
+            <if test="q.keyword != null and q.keyword != ''">
+                AND (code LIKE CONCAT('%', #{q.keyword}, '%')
+                OR name LIKE CONCAT('%', #{q.keyword}, '%'))
+            </if>
+            <if test="q.status != null">
+                AND status = #{q.status}
+            </if>
+            <if test="q.startTime != null">
+                AND create_time &gt;= #{q.startTime}
+            </if>
+            <if test="q.endTime != null">
+                AND create_time &lt;= #{q.endTime}
+            </if>
+        </if>
+        ORDER BY sort_no ASC, id DESC
+    </select>
+
+</mapper>
