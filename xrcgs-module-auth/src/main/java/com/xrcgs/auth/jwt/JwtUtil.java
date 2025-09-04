@@ -34,16 +34,16 @@ public class JwtUtil {
                 .build();
     }
 
-    public String generateAccessToken(String username, String nickname, Collection<String> roles, Collection<String> permissions) {
-        return buildToken(username, nickname, roles, permissions, "access", props.getAccessTtlSeconds());
+    public String generateAccessToken(Long id, String username, String nickname, Collection<String> roles, Collection<String> permissions) {
+        return buildToken(id, username, nickname, roles, permissions, "access", props.getAccessTtlSeconds());
     }
 
-    public String generateRefreshToken(String username) {
-        return buildToken(username, null, null, null, "refresh", props.getRefreshTtlSeconds());
+    public String generateRefreshToken(Long id, String username) {
+        return buildToken(id, username, null, null, null, "refresh", props.getRefreshTtlSeconds());
     }
 
     // 生产token
-    private String buildToken(String username, String nickname, Collection<String> roles, Collection<String> permissions, String typ, long ttlSeconds) {
+    private String buildToken(Long id, String username, String nickname, Collection<String> roles, Collection<String> permissions, String typ, long ttlSeconds) {
         Instant now = Instant.now();
         String jti = UUID.randomUUID().toString();
 
@@ -55,6 +55,7 @@ public class JwtUtil {
                 .setExpiration(Date.from(now.plusSeconds(ttlSeconds)))
                 .claim("typ", typ);
 
+        if (id != null) builder.claim("uid", id);
         if (nickname != null) builder.claim("nickname", nickname);
         if (roles != null) builder.claim("roles", roles);
         if (permissions != null) builder.claim("permissions", permissions);

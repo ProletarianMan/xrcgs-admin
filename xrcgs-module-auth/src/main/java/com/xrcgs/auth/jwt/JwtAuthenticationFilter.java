@@ -2,12 +2,15 @@ package com.xrcgs.auth.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.auth.security.AuthUserDetailsService;
+import com.xrcgs.common.security.UserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.*;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -17,6 +20,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.*;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -63,11 +69,38 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
 
             String username = claims.getSubject();
+            Long userId = claims.get("uid", Long.class);
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails user = userDetailsService.loadUserByUsername(username);
+//                UserDetails user = userDetailsService.loadUserByUsername(username);
 
+                // === 变更点 #2：不再查库，直接把 roles/perms 从 claims 注入到 authorities ===
+                List<GrantedAuthority> auths = new ArrayList<>();
+
+                // 角色权限
+                // roles: ["ADMIN","OPS"] -> ROLE_ADMIN / ROLE_OPS
+                List<String> roles = claims.get("roles", List.class);
+                if (roles != null) {
+                    for (String r : roles) {
+                        auths.add(new SimpleGrantedAuthority("ROLE_" + r));
+                    }
+                }
+
+                // 按钮权限
+                // perms: ["iam:user:list", ...] -> PERM_iam:user:list
+                Collection<String> perms = claims.get("perms", Collection.class);
+                if (perms != null) {
+                    for (String p : perms) {
+                        auths.add(new SimpleGrantedAuthority("PERM_" + p));
+                    }
+                }
+
+                // principal：给 hasPerm() 的表达式 Root 提取 userId 做兜底回源（必要时）
+                UserPrincipal principal = new UserPrincipal(userId, username);
+
+//                UsernamePasswordAuthenticationToken authentication =
+//                        new UsernamePasswordAuthenticationToken(user, null, auths);
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                        new UsernamePasswordAuthenticationToken(principal, null, auths);
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }

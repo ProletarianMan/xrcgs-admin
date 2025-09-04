@@ -69,8 +69,8 @@ public class AuthController {
         Set<String> perms = permService.loadAndCacheUserPerms(db.getId());
 
         // 4) token生成
-        String access = jwtUtil.generateAccessToken(principal.getUsername(), nickname, roleCodes, perms);
-        String refresh = jwtUtil.generateRefreshToken(principal.getUsername());
+        String access = jwtUtil.generateAccessToken(db.getId(), principal.getUsername(), nickname, roleCodes, perms);
+        String refresh = jwtUtil.generateRefreshToken(db.getId(), principal.getUsername());
 
         // 返回前端需要的内容
         return ResponseEntity.ok(LoginResponse.builder()
@@ -143,7 +143,7 @@ public class AuthController {
         Set<String> perms = permService.loadAndCacheUserPerms(db.getId());
 
         // 生成新Token
-        String newAccess = jwtUtil.generateAccessToken(username, db.getNickname(), roleCodes, perms);
+        String newAccess = jwtUtil.generateAccessToken(db.getId(), username, db.getNickname(), roleCodes, perms);
         return ResponseEntity.ok(TokenResponse.builder()
                 .token(newAccess)
                 .expiresIn(props.getAccessTtlSeconds())
