@@ -16,6 +16,13 @@
     </properties>
 
     <dependencies>
+        <!-- 仅为使用 @PreAuthorize 注解提供编译期符号；运行期由 auth 模块提供 -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
