@@ -23,4 +23,21 @@
         ORDER BY sort ASC, id ASC
     </select>
 
+
+    <!-- 分页：按 typeCode + label 模糊，启用项优先；排序：sort asc, id asc -->
+    <select id="selectPageByQuery" resultType="com.xrcgs.iam.entity.SysDictItem">
+        SELECT
+        id, type_code, label, value, ext, sort, status,
+        create_by, create_time, update_by, update_time, del_flag
+        FROM sys_dict_item
+        WHERE del_flag = 0
+        <if test="q != null and q.typeCode != null and q.typeCode != ''">
+            AND type_code = #{q.typeCode}
+        </if>
+        <if test="q != null and q.label != null and q.label != ''">
+            AND label LIKE CONCAT('%', #{q.label}, '%')
+        </if>
+        ORDER BY status DESC, sort ASC, id ASC
+    </select>
+
 </mapper>

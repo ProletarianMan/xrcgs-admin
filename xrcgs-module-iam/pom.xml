@@ -16,6 +16,13 @@
     </properties>
 
     <dependencies>
+
+        <!-- Spring Web / Validation -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
         <!-- 仅为使用 @PreAuthorize 注解提供编译期符号；运行期由 auth 模块提供 -->
         <dependency>
             <groupId>org.springframework.security</groupId>
@@ -46,6 +53,13 @@
         <dependency>
             <groupId>com.xrcgs</groupId>
             <artifactId>xrcgs-infrastructure</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- 日志模块 -->
+        <dependency>
+            <groupId>com.xrcgs</groupId>
+            <artifactId>xrcgs-module-syslog</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

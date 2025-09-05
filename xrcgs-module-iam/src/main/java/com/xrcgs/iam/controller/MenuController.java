@@ -1,0 +1,81 @@
+package com.xrcgs.iam.controller;
+
+import com.xrcgs.iam.entity.SysMenu;
+import com.xrcgs.iam.model.query.MenuQuery;
+import com.xrcgs.iam.model.vo.MenuTreeVO;
+import com.xrcgs.iam.service.MenuService;
+// ↓↓↓ 按你项目实际包名修改
+import com.xrcgs.common.core.R;
+
+import com.xrcgs.syslog.annotation.OpLog;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * 菜单操作
+ * iam:menu:list|tree|create|update|delete
+ */
+@Validated
+@RestController
+@RequestMapping("/api/iam/menu")
+@RequiredArgsConstructor
+public class MenuController {
+
+    private final MenuService menuService;
+
+    // 列表（支持条件查询）
+    @GetMapping("/list")
+    @PreAuthorize("hasPerm('iam:menu:list')")
+    public R<List<SysMenu>> list(@Valid MenuQuery q) {
+        return R.ok(menuService.list(q));
+    }
+
+    // 全量启用态菜单树（前端构建路由用）
+    @GetMapping("/tree/all")
+    @PreAuthorize("hasPerm('iam:menu:tree')")
+    public R<List<MenuTreeVO>> treeAllEnabled() {
+        return R.ok(menuService.treeAllEnabled());
+    }
+
+    // 指定角色的菜单树
+    @GetMapping("/tree/{roleId}")
+    @PreAuthorize("hasPerm('iam:menu:tree')")
+    public R<List<MenuTreeVO>> treeByRole(@PathVariable @NotNull Long roleId) {
+        return R.ok(menuService.treeByRole(roleId));
+    }
+
+    // 新增菜单
+    @PostMapping
+    @OpLog("新增菜单")
+    @PreAuthorize("hasPerm('iam:menu:create')")
+    public R<Long> create(@Valid @RequestBody SysMenu menu) {
+        Long id = menuService.create(menu);
+        return R.ok(id);
+    }
+
+    // 修改菜单
+    @PutMapping("/{id}")
+    @OpLog("修改菜单")
+    @PreAuthorize("hasPerm('iam:menu:update')")
+    public R<Boolean> update(@PathVariable @NotNull Long id,
+                             @Valid @RequestBody SysMenu menu) {
+        menu.setId(id);
+        menuService.update(menu);
+        return R.ok(true);
+    }
+
+    // 删除菜单（无子节点才能删）
+    @DeleteMapping("/{id}")
+    @OpLog("删除菜单")
+    @PreAuthorize("hasPerm('iam:menu:delete')")
+    public R<Boolean> delete(@PathVariable @NotNull Long id) {
+        menuService.remove(id);
+        return R.ok(true);
+    }
+}
