@@ -7,7 +7,7 @@ import org.springframework.security.access.expression.method.DefaultMethodSecuri
 import org.springframework.security.core.Authentication;
 
 /**
- * iam角色权限---表达式处理器
+ * iam角色--表达式处理器
  */
 public class IamMethodSecurityExpressionHandler extends DefaultMethodSecurityExpressionHandler {
     @Resource
