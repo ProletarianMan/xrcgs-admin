@@ -89,6 +89,7 @@ public class RoleController {
     @PostMapping("/grant-menus")
     @OpLog("角色授权菜单")
     @PreAuthorize("hasPerm('iam:role:grantMenu')")
+
     public R<Boolean> grantMenus(@Valid @RequestBody RoleGrantMenuDTO dto) {
         roleService.grantMenus(dto);
         return R.ok(true);

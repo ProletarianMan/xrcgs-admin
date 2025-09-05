@@ -1,7 +1,7 @@
 package com.xrcgs.common.constants;
 
 /**
- * 角色模块---redis缓存常量键
+ * 角色模块---redis缓存常量键（Key）
  */
 public interface IamCacheKeys {
 

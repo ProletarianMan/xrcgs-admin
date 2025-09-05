@@ -37,7 +37,7 @@ public class DictController {
 
     /** 字典项分页：按 typeCode + label 模糊 */
     @GetMapping("/item/page")
-    @org.springframework.security.access.prepost.PreAuthorize("hasPerm('iam:dict:item:list')")
+    @PreAuthorize("hasPerm('iam:dict:item:list')")
     public com.xrcgs.common.core.R<Page<SysDictItem>> itemPage(
             @Valid DictItemPageQuery q,
             @RequestParam(defaultValue = "1") long pageNo,
