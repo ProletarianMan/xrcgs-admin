@@ -1,7 +1,6 @@
 package com.xrcgs.auth.security;
 
 import com.xrcgs.common.cache.AuthCacheService;
-import jakarta.annotation.Resource;
 import org.aopalliance.intercept.MethodInvocation;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.core.Authentication;
@@ -10,8 +9,12 @@ import org.springframework.security.core.Authentication;
  * iam角色--表达式处理器
  */
 public class IamMethodSecurityExpressionHandler extends DefaultMethodSecurityExpressionHandler {
-    @Resource
-    private AuthCacheService authCacheService;
+
+    private final AuthCacheService authCacheService;
+
+    public IamMethodSecurityExpressionHandler(AuthCacheService authCacheService) {
+        this.authCacheService = authCacheService;
+    }
 
     @Override
     protected IamSecurityExpressionRoot createSecurityExpressionRoot(Authentication authentication,

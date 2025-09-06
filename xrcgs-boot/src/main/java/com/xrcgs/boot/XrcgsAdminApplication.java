@@ -5,9 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGenerator;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
-@EnableMethodSecurity   // 关键：启用 @PreAuthorize 等方法安全拦截
 @SpringBootApplication(scanBasePackages = "com.xrcgs")
 @ConfigurationPropertiesScan(basePackages = "com.xrcgs") // 关键：让 @ConfigurationProperties 生效
 @MapperScan(
