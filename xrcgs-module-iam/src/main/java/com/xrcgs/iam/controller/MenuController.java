@@ -31,21 +31,21 @@ public class MenuController {
 
     // 列表（支持条件查询）
     @GetMapping("/list")
-    @PreAuthorize("hasPerm('iam:menu:list')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:list')")
     public R<List<SysMenu>> list(@Valid MenuQuery q) {
         return R.ok(menuService.list(q));
     }
 
     // 全量启用态菜单树（前端构建路由用）
     @GetMapping("/tree/all")
-    @PreAuthorize("hasPerm('iam:menu:tree')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:tree')")
     public R<List<MenuTreeVO>> treeAllEnabled() {
         return R.ok(menuService.treeAllEnabled());
     }
 
     // 指定角色的菜单树
     @GetMapping("/tree/{roleId}")
-    @PreAuthorize("hasPerm('iam:menu:tree')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:tree')")
     public R<List<MenuTreeVO>> treeByRole(@PathVariable @NotNull Long roleId) {
         return R.ok(menuService.treeByRole(roleId));
     }
@@ -53,7 +53,7 @@ public class MenuController {
     // 新增菜单
     @PostMapping
     @OpLog("新增菜单")
-    @PreAuthorize("hasPerm('iam:menu:create')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:create')")
     public R<Long> create(@Valid @RequestBody SysMenu menu) {
         Long id = menuService.create(menu);
         return R.ok(id);
@@ -62,7 +62,7 @@ public class MenuController {
     // 修改菜单
     @PutMapping("/{id}")
     @OpLog("修改菜单")
-    @PreAuthorize("hasPerm('iam:menu:update')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:update')")
     public R<Boolean> update(@PathVariable @NotNull Long id,
                              @Valid @RequestBody SysMenu menu) {
         menu.setId(id);
@@ -73,7 +73,7 @@ public class MenuController {
     // 删除菜单（无子节点才能删）
     @DeleteMapping("/{id}")
     @OpLog("删除菜单")
-    @PreAuthorize("hasPerm('iam:menu:delete')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:delete')")
     public R<Boolean> delete(@PathVariable @NotNull Long id) {
         menuService.remove(id);
         return R.ok(true);

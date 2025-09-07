@@ -33,7 +33,7 @@ public class RoleController {
 
     // 分页查询
     @GetMapping("/page")
-    @PreAuthorize("hasPerm('iam:role:list')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:list')")
     public R<Page<SysRole>> page(@Valid RolePageQuery q,
                                  @RequestParam(defaultValue = "1") long pageNo,
                                  @RequestParam(defaultValue = "10") long pageSize) {
@@ -44,7 +44,7 @@ public class RoleController {
     // 新增
     @PostMapping
     @OpLog("新增角色")
-    @PreAuthorize("hasPerm('iam:role:create')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:create')")
     public R<Long> create(@Valid @RequestBody RoleUpsertDTO dto) {
         dto.setId(null);
         Long id = roleService.upsert(dto);
@@ -54,7 +54,7 @@ public class RoleController {
     // 修改
     @PutMapping("/{id}")
     @OpLog("修改角色")
-    @PreAuthorize("hasPerm('iam:role:update')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:update')")
     public R<Long> update(@PathVariable @NotNull Long id,
                           @Valid @RequestBody RoleUpsertDTO dto) {
         dto.setId(id);
@@ -65,7 +65,7 @@ public class RoleController {
     // 删除
     @DeleteMapping("/{id}")
     @OpLog("删除角色")
-    @PreAuthorize("hasPerm('iam:role:delete')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:delete')")
     public R<Boolean> delete(@PathVariable @NotNull Long id) {
         roleService.remove(id);
         return R.ok(true);
@@ -73,14 +73,14 @@ public class RoleController {
 
     // 角色拥有的菜单ID
     @GetMapping("/{id}/menu-ids")
-    @PreAuthorize("hasPerm('iam:role:grantMenu')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:grantMenu')")
     public R<List<Long>> listRoleMenuIds(@PathVariable @NotNull Long id) {
         return R.ok(roleService.listMenuIdsByRole(id));
     }
 
     // 角色拥有的权限ID（独立权限表，可选）
     @GetMapping("/{id}/perm-ids")
-    @PreAuthorize("hasPerm('iam:role:grantPerm')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:grantPerm')")
     public R<List<Long>> listRolePermIds(@PathVariable @NotNull Long id) {
         return R.ok(roleService.listPermIdsByRole(id));
     }
@@ -88,7 +88,7 @@ public class RoleController {
     // 分配菜单
     @PostMapping("/grant-menus")
     @OpLog("角色授权菜单")
-    @PreAuthorize("hasPerm('iam:role:grantMenu')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:grantMenu')")
 
     public R<Boolean> grantMenus(@Valid @RequestBody RoleGrantMenuDTO dto) {
         roleService.grantMenus(dto);
@@ -98,7 +98,7 @@ public class RoleController {
     // 分配权限码（独立权限）
     @PostMapping("/grant-perms")
     @OpLog("角色授权权限码")
-    @PreAuthorize("hasPerm('iam:role:grantPerm')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:grantPerm')")
     public R<Boolean> grantPerms(@Valid @RequestBody RoleGrantPermDTO dto) {
         roleService.grantPerms(dto);
         return R.ok(true);

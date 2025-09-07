@@ -9,11 +9,12 @@ import java.time.LocalDateTime;
 
 /**
  * 统一审计字段自动填充：
- * - createdAt: LocalDateTime，insert 时填
+ * - createdAt/createTime: LocalDateTime，insert 时填
+ * - updateTime: LocalDateTime，insert/update 时填
  * - createdBy: Long（从 Security 获取），insert 时填（拿不到则不填）
  *
  * 说明：
- * - 这是“唯一”的 createdAt/createdBy 填充器；其他模块请勿重复设置。
+ * - 这是“唯一”的审计字段填充器；其他模块请勿重复设置。
  */
 @Component
 @Order(100) // 先于多数通用填充器执行；如有需要可调整顺序
@@ -27,8 +28,11 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void insertFill(MetaObject metaObject) {
+        LocalDateTime now = LocalDateTime.now();
         // 若实体未显式赋值，则自动填充
-        strictInsertFill(metaObject, "createdAt", LocalDateTime::now, LocalDateTime.class);
+        strictInsertFill(metaObject, "createdAt", () -> now, LocalDateTime.class);
+        strictInsertFill(metaObject, "createTime", () -> now, LocalDateTime.class);
+        strictInsertFill(metaObject, "updateTime", () -> now, LocalDateTime.class);
 
         Long uid = userIdProvider.getCurrentUserId();
         if (uid != null) {
@@ -38,6 +42,6 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        // 如需 updatedAt/updatedBy，将来在此扩展；目前不做
+        strictUpdateFill(metaObject, "updateTime", LocalDateTime::now, LocalDateTime.class);
     }
 }
