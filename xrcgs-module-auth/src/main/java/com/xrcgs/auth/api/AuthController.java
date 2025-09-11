@@ -5,6 +5,7 @@ import com.xrcgs.auth.api.dto.AuthDtos.*;
 import com.xrcgs.auth.jwt.*;
 import com.xrcgs.auth.user.SysUser;
 import com.xrcgs.auth.user.SysUserMapper;
+import com.xrcgs.common.core.R;
 import com.xrcgs.iam.entity.SysRole;
 import com.xrcgs.iam.entity.SysUserRole;
 import com.xrcgs.iam.mapper.SysRoleMapper;
@@ -44,7 +45,7 @@ public class AuthController {
 
     /** 登入 */
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
+    public R<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(req.getUsername(), req.getPassword())
         );
@@ -73,12 +74,12 @@ public class AuthController {
         String refresh = jwtUtil.generateRefreshToken(db.getId(), principal.getUsername());
 
         // 返回前端需要的内容
-        return ResponseEntity.ok(LoginResponse.builder()
+        return R.ok(LoginResponse.builder()
                 .username(principal.getUsername())
                 .nickname(nickname)
                 .token(access)
                 .refreshToken(refresh)
-                .expiresIn(props.getAccessTtlSeconds())
+                .expires(props.getAccessTtlSeconds())
                 .roles(roleCodes)
                 .permissions(perms)
                 .build());
@@ -146,7 +147,7 @@ public class AuthController {
         String newAccess = jwtUtil.generateAccessToken(db.getId(), username, db.getNickname(), roleCodes, perms);
         return ResponseEntity.ok(TokenResponse.builder()
                 .token(newAccess)
-                .expiresIn(props.getAccessTtlSeconds())
+                .expires(props.getAccessTtlSeconds())
                 .build());
     }
 }

@@ -24,7 +24,7 @@ public class AuthDtos {
         private String nickname;
         private String token;         // access token
         private String refreshToken;
-        private long   expiresIn;     // seconds
+        private long   expires;     // seconds
         private List<String> roles;  // 角色权限
         private Set<String> permissions; // 当前登录用户的按钮级别权限
     }
@@ -37,7 +37,7 @@ public class AuthDtos {
     @Data @AllArgsConstructor @NoArgsConstructor @Builder
     public static class TokenResponse {
         private String token;     // access token
-        private long   expiresIn; // seconds
+        private long   expires; // seconds
         private Map<String, Object> extra; // 扩展可选
     }
 }

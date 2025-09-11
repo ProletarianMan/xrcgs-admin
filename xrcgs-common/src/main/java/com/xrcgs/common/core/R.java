@@ -1,5 +1,8 @@
 package com.xrcgs.common.core;
 
+import lombok.Data;
+import lombok.Getter;
+
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
@@ -8,6 +11,7 @@ import java.time.Instant;
  * 统一返回包装类
  * 结构：{ "code": 200, "message": "ok", "data": {...}, "timestamp": 1711111111 }
  */
+@Data
 public class R<T> implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
@@ -66,18 +70,4 @@ public class R<T> implements Serializable {
     public boolean isSuccess() {
         return this.code == 200;
     }
-
-    /* ---------- Getter / Setter ---------- */
-
-    public int getCode() { return code; }
-    public void setCode(int code) { this.code = code; }
-
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
-
-    public T getData() { return data; }
-    public void setData(T data) { this.data = data; }
-
-    public long getTimestamp() { return timestamp; }
-    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
 }
