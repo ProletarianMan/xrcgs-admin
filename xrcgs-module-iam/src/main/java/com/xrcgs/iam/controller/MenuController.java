@@ -43,9 +43,8 @@ public class MenuController {
         return R.ok(menuService.treeAllEnabled());
     }
 
-    // 指定角色的菜单树
+    // 指定角色的菜单树(不应该启用权限，登陆时需要拉去)
     @GetMapping("/tree/{roleId}")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:tree')")
     public R<List<MenuTreeVO>> treeByRole(@PathVariable @NotNull Long roleId) {
         return R.ok(menuService.treeByRole(roleId));
     }
