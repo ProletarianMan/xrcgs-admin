@@ -15,7 +15,8 @@ public class SysMenu {
     private Long id;
 
     private Long parentId;
-    private String name;
+    private String title;
+    private String routerName;
     private String path;
     private String component;
 
@@ -24,7 +25,12 @@ public class SysMenu {
 
     private String perms;   // 例：iam:user:list
     private String icon;
-    private Integer orderNo;
+    @TableField("rank")
+    private Integer rank;
+    @TableField("keep_alive")
+    private Boolean keepAlive;
+    @TableField("show_parent")
+    private Boolean showParent;
     private Integer visible; // 1显示 0隐藏
     private Integer status;  // 1启用 0禁用
 
