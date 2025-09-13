@@ -49,6 +49,12 @@ public class MenuController {
         return R.ok(menuService.treeByRole(roleId));
     }
 
+    // 根据角色编码集合获取菜单树
+    @PostMapping("/tree/by-codes")
+    public R<List<MenuTreeVO>> treeByRoleCodes(@RequestBody List<String> roleCodes) {
+        return R.ok(menuService.treeByRoleCodes(roleCodes));
+    }
+
     /**
      * 新增菜单
      * 支持接收 routerName、keepAlive、showParent 等前端路由字段
