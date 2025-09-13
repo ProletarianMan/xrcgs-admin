@@ -115,28 +115,30 @@ public class MenuServiceImpl implements MenuService {
 
     private List<MenuTreeVO> buildTree(List<SysMenu> flat) {
         Map<Long, MenuTreeVO> map = new LinkedHashMap<>();
-        for (SysMenu m : flat) {
-            MenuTreeVO vo = new MenuTreeVO();
-            vo.setName(m.getRouterName());
-            vo.setPath(m.getPath());
-            vo.setComponent(m.getComponent());
+        for (SysMenu menu : flat) {
             MenuMetaVO meta = new MenuMetaVO();
-            meta.setTitle(m.getTitle());
-            meta.setIcon(m.getIcon());
-            meta.setRank(m.getRank());
-            meta.setKeepAlive(m.getKeepAlive());
-            meta.setShowParent(m.getShowParent());
-            vo.setMeta(meta);
-            map.put(m.getId(), vo);
+            meta.setTitle(menu.getTitle());
+            meta.setIcon(menu.getIcon());
+            meta.setRank(menu.getRank());
+            meta.setKeepAlive(menu.getKeepAlive());
+            meta.setShowParent(menu.getShowParent());
+
+            MenuTreeVO node = new MenuTreeVO();
+            node.setName(menu.getRouterName());
+            node.setPath(menu.getPath());
+            node.setComponent(menu.getComponent());
+            node.setMeta(meta);
+            map.put(menu.getId(), node);
         }
+
         List<MenuTreeVO> roots = new ArrayList<>();
-        for (SysMenu m : flat) {
-            MenuTreeVO vo = map.get(m.getId());
-            Long pid = m.getParentId();
+        for (SysMenu menu : flat) {
+            MenuTreeVO node = map.get(menu.getId());
+            Long pid = menu.getParentId();
             if (pid == null || pid == 0 || !map.containsKey(pid)) {
-                roots.add(vo);
+                roots.add(node);
             } else {
-                map.get(pid).getChildren().add(vo);
+                map.get(pid).getChildren().add(node);
             }
         }
         return roots;
