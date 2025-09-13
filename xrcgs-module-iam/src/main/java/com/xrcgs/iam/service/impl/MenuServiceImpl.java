@@ -10,6 +10,7 @@ import com.xrcgs.iam.mapper.SysRoleMapper;
 import com.xrcgs.iam.mapper.SysRoleMenuMapper;
 import com.xrcgs.iam.model.query.MenuQuery;
 import com.xrcgs.iam.model.vo.MenuMetaVO;
+import com.xrcgs.iam.model.vo.MenuRouteVO;
 import com.xrcgs.iam.model.vo.MenuTreeVO;
 import com.xrcgs.iam.service.MenuService;
 import com.xrcgs.common.cache.AuthCacheService;
@@ -102,7 +103,7 @@ public class MenuServiceImpl implements MenuService {
     }
 
     @Override
-    public List<MenuTreeVO> treeByRoleCodes(List<String> roleCodes) {
+    public List<MenuRouteVO> listByRoleCodes(List<String> roleCodes) {
         if (roleCodes == null || roleCodes.isEmpty()) {
             return Collections.emptyList();
         }
@@ -119,7 +120,20 @@ public class MenuServiceImpl implements MenuService {
         }
         List<SysMenu> list = new ArrayList<>(map.values());
         list.sort(Comparator.comparing(SysMenu::getRank).thenComparing(SysMenu::getId));
-        return buildTree(list);
+        return list.stream().map(menu -> {
+            MenuRouteVO vo = new MenuRouteVO();
+            vo.setId(menu.getId());
+            vo.setParentId(menu.getParentId());
+            vo.setPath(menu.getPath());
+            vo.setName(menu.getRouterName());
+            vo.setComponent(menu.getComponent());
+            vo.setTitle(menu.getTitle());
+            vo.setIcon(menu.getIcon());
+            vo.setRank(menu.getRank());
+            vo.setKeepAlive(Boolean.TRUE.equals(menu.getKeepAlive()));
+            vo.setShowParent(Boolean.TRUE.equals(menu.getShowParent()));
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     @Override

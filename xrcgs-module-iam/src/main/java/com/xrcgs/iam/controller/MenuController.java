@@ -2,6 +2,7 @@ package com.xrcgs.iam.controller;
 
 import com.xrcgs.iam.entity.SysMenu;
 import com.xrcgs.iam.model.query.MenuQuery;
+import com.xrcgs.iam.model.vo.MenuRouteVO;
 import com.xrcgs.iam.model.vo.MenuTreeVO;
 import com.xrcgs.iam.service.MenuService;
 // ↓↓↓ 按你项目实际包名修改
@@ -50,10 +51,10 @@ public class MenuController {
         return R.ok(menuService.treeByRole(roleId));
     }
 
-    // 根据角色编码集合获取菜单树
+    // 根据角色编码集合获取菜单列表（平铺）
     @PostMapping("/tree/by-codes")
-    public R<List<MenuTreeVO>> treeByRoleCodes(@RequestBody List<String> roleCodes) {
-        return R.ok(menuService.treeByRoleCodes(roleCodes));
+    public List<MenuRouteVO> listByRoleCodes(@RequestBody List<String> roleCodes) {
+        return menuService.listByRoleCodes(roleCodes);
     }
 
     /**
