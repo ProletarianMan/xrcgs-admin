@@ -9,7 +9,7 @@ import lombok.Data;
  */
 @Data
 public class MenuQuery {
-    private String keyword;   // 按 name/path/perms 模糊
+    private String keyword;   // 按 title/path/perms 模糊
     private Integer status;   // 1/0
     private MenuType type;    // 可选过滤：DIR/MENU/BUTTON/API
     private Long parentId;    // 查某父节点下

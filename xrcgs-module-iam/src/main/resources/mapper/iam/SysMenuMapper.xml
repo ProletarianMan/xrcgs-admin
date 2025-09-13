@@ -6,15 +6,18 @@
     <resultMap id="MenuMap" type="com.xrcgs.iam.entity.SysMenu">
         <id     property="id"        column="id"/>
         <result property="parentId"  column="parent_id"/>
-        <result property="name"      column="name"/>
-        <result property="path"      column="path"/>
-        <result property="component" column="component"/>
-        <result property="type"      column="type"/>
-        <result property="perms"     column="perms"/>
-        <result property="icon"      column="icon"/>
-        <result property="orderNo"   column="order_no"/>
-        <result property="visible"   column="visible"/>
-        <result property="status"    column="status"/>
+        <result property="title"      column="title"/>
+        <result property="routerName" column="router_name"/>
+        <result property="path"       column="path"/>
+        <result property="component"  column="component"/>
+        <result property="type"       column="type"/>
+        <result property="perms"      column="perms"/>
+        <result property="icon"       column="icon"/>
+        <result property="rank"       column="rank"/>
+        <result property="keepAlive"  column="keep_alive"/>
+        <result property="showParent" column="show_parent"/>
+        <result property="visible"    column="visible"/>
+        <result property="status"     column="status"/>
         <result property="createTime" column="create_time"/>
         <result property="updateTime" column="update_time"/>
         <result property="delFlag"   column="del_flag"/>
@@ -25,7 +28,7 @@
         WHERE del_flag = 0
         <if test="q != null">
             <if test="q.keyword != null and q.keyword != ''">
-                AND (name LIKE CONCAT('%', #{q.keyword}, '%')
+                AND (title LIKE CONCAT('%', #{q.keyword}, '%')
                 OR path LIKE CONCAT('%', #{q.keyword}, '%')
                 OR perms LIKE CONCAT('%', #{q.keyword}, '%'))
             </if>
@@ -42,7 +45,7 @@
                 AND visible = #{q.visible}
             </if>
         </if>
-        ORDER BY order_no ASC, id ASC
+        ORDER BY rank ASC, id ASC
     </select>
 
     <!-- 通过角色查菜单（基于角色-菜单表） -->
@@ -50,7 +53,7 @@
         SELECT m.* FROM sys_menu m
                             INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
         WHERE rm.role_id = #{roleId} AND m.del_flag = 0
-        ORDER BY m.order_no ASC, m.id ASC
+        ORDER BY m.rank ASC, m.id ASC
     </select>
 
 </mapper>
