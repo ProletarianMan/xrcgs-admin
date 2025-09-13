@@ -13,5 +13,6 @@ public interface MenuService {
 
     List<MenuTreeVO> treeAllEnabled();       // 全部启用态
     List<MenuTreeVO> treeByRole(Long roleId); // 指定角色
+    List<MenuTreeVO> treeByRoleCodes(List<String> roleCodes); // 通过角色编码集合
     List<SysMenu> list(MenuQuery q);
 }

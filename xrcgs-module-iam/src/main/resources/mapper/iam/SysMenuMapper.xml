@@ -62,4 +62,18 @@
         ORDER BY m.rank ASC, m.id ASC
     </select>
 
+    <select id="selectByRoleIds" resultMap="MenuMap">
+        SELECT DISTINCT m.id, m.parent_id, m.title, m.router_name, m.path, m.component,
+               m.type, m.perms, m.icon, m.rank, m.keep_alive, m.show_parent,
+               m.visible, m.status, m.created_at, m.updated_at, m.del_flag
+        FROM sys_menu m
+                 INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        WHERE rm.role_id IN
+        <foreach collection="roleIds" item="rid" open="(" separator="," close=")">
+            #{rid}
+        </foreach>
+          AND m.del_flag = 0
+        ORDER BY m.rank ASC, m.id ASC
+    </select>
+
 </mapper>
