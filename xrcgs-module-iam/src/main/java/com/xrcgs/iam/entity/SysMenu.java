@@ -34,10 +34,10 @@ public class SysMenu {
     private Integer visible; // 1显示 0隐藏
     private Integer status;  // 1启用 0禁用
 
-    @TableField(fill = FieldFill.INSERT)
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
-    @TableField(fill = FieldFill.INSERT_UPDATE)
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
     @TableLogic(value = "0", delval = "1")
