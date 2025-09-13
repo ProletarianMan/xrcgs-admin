@@ -120,8 +120,9 @@ public class MenuServiceImpl implements MenuService {
             meta.setTitle(menu.getTitle());
             meta.setIcon(menu.getIcon());
             meta.setRank(menu.getRank());
-            meta.setKeepAlive(menu.getKeepAlive());
-            meta.setShowParent(menu.getShowParent());
+            // 前端路由元数据的布尔字段不应为 null，避免客户端解析出错
+            meta.setKeepAlive(Boolean.TRUE.equals(menu.getKeepAlive()));
+            meta.setShowParent(Boolean.TRUE.equals(menu.getShowParent()));
 
             MenuTreeVO node = new MenuTreeVO();
             node.setName(menu.getRouterName());
