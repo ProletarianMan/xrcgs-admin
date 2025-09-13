@@ -49,7 +49,10 @@ public class MenuController {
         return R.ok(menuService.treeByRole(roleId));
     }
 
-    // 新增菜单
+    /**
+     * 新增菜单
+     * 支持接收 routerName、keepAlive、showParent 等前端路由字段
+     */
     @PostMapping
     @OpLog("新增菜单")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:create')")
@@ -58,7 +61,10 @@ public class MenuController {
         return R.ok(id);
     }
 
-    // 修改菜单
+    /**
+     * 修改菜单
+     * 支持接收 routerName、keepAlive、showParent 等前端路由字段
+     */
     @PutMapping("/{id}")
     @OpLog("修改菜单")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:menu:update')")

@@ -15,8 +15,8 @@ public class SysMenu {
     private Long id;
 
     private Long parentId;
-    private String title;
-    private String routerName;
+    private String title;         // 菜单显示名称
+    private String routerName;    // 前端路由名称
     private String path;
     private String component;
 
@@ -28,9 +28,9 @@ public class SysMenu {
     @TableField("rank")
     private Integer rank;
     @TableField("keep_alive")
-    private Boolean keepAlive;
+    private Boolean keepAlive;    // 是否开启组件缓存
     @TableField("show_parent")
-    private Boolean showParent;
+    private Boolean showParent;   // 面包屑中是否显示父级
     private Integer visible; // 1显示 0隐藏
     private Integer status;  // 1启用 0禁用
 
