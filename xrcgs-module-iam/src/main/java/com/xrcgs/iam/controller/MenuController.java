@@ -3,6 +3,7 @@ package com.xrcgs.iam.controller;
 import com.xrcgs.iam.entity.SysMenu;
 import com.xrcgs.iam.model.query.MenuQuery;
 import com.xrcgs.iam.model.vo.MenuTreeVO;
+import com.xrcgs.iam.model.vo.MenuVO;
 import com.xrcgs.iam.service.MenuService;
 // ↓↓↓ 按你项目实际包名修改
 import com.xrcgs.common.core.R;
@@ -47,6 +48,12 @@ public class MenuController {
     @GetMapping("/tree/{roleId}")
     public R<List<MenuTreeVO>> treeByRole(@PathVariable @NotNull Long roleId) {
         return R.ok(menuService.treeByRole(roleId));
+    }
+
+    // 根据角色编码集合获取菜单列表
+    @PostMapping("/tree/by-codes")
+    public List<MenuVO> treeByRoleCodes(@RequestBody List<String> roleCodes) {
+        return menuService.treeByRoleCodes(roleCodes);
     }
 
     /**

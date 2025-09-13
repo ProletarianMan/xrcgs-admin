@@ -6,10 +6,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.iam.entity.SysMenu;
 import com.xrcgs.iam.entity.SysRoleMenu;
 import com.xrcgs.iam.mapper.SysMenuMapper;
+import com.xrcgs.iam.mapper.SysRoleMapper;
 import com.xrcgs.iam.mapper.SysRoleMenuMapper;
 import com.xrcgs.iam.model.query.MenuQuery;
 import com.xrcgs.iam.model.vo.MenuMetaVO;
 import com.xrcgs.iam.model.vo.MenuTreeVO;
+import com.xrcgs.iam.model.vo.MenuVO;
 import com.xrcgs.iam.service.MenuService;
 import com.xrcgs.common.cache.AuthCacheService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 public class MenuServiceImpl implements MenuService {
 
     private final SysMenuMapper menuMapper;
+    private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
     private final AuthCacheService cacheService;
     private final ObjectMapper om = new ObjectMapper();
@@ -97,6 +100,42 @@ public class MenuServiceImpl implements MenuService {
             cacheService.cacheMenuTreeByRole(roleId, om.writeValueAsString(tree));
         } catch (Exception ignore) {}
         return tree;
+    }
+
+    @Override
+    public List<MenuVO> treeByRoleCodes(List<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Long> roleIds = roleMapper.selectIdsByCodes(roleCodes);
+        if (roleIds == null || roleIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<SysMenu> menus = menuMapper.selectByRoleIds(roleIds);
+        Map<Long, SysMenu> map = new LinkedHashMap<>();
+        for (SysMenu m : menus) {
+            if (m.getStatus() != null && m.getStatus() == 1 && m.getDelFlag() != null && m.getDelFlag() == 0) {
+                map.put(m.getId(), m);
+            }
+        }
+        List<SysMenu> list = new ArrayList<>(map.values());
+        list.sort(Comparator.comparing(SysMenu::getRank).thenComparing(SysMenu::getId));
+        List<MenuVO> flat = new ArrayList<>();
+        for (SysMenu m : list) {
+            MenuVO vo = new MenuVO();
+            vo.setId(m.getId());
+            vo.setParentId(m.getParentId());
+            vo.setPath(m.getPath());
+            vo.setName(m.getRouterName());
+            vo.setComponent(m.getComponent());
+            vo.setTitle(m.getTitle());
+            vo.setIcon(m.getIcon());
+            vo.setRank(m.getRank());
+            vo.setKeepAlive(Boolean.TRUE.equals(m.getKeepAlive()));
+            vo.setShowParent(Boolean.TRUE.equals(m.getShowParent()));
+            flat.add(vo);
+        }
+        return flat;
     }
 
     @Override

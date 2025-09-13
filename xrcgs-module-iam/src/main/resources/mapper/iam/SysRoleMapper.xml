@@ -28,4 +28,13 @@
         ORDER BY sort_no ASC, id DESC
     </select>
 
+    <select id="selectIdsByCodes" resultType="java.lang.Long">
+        SELECT id FROM sys_role
+        WHERE code IN
+        <foreach collection="codes" item="code" open="(" separator="," close=")">
+            #{code}
+        </foreach>
+          AND del_flag = 0
+    </select>
+
 </mapper>

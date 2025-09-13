@@ -6,6 +6,9 @@ import com.xrcgs.iam.entity.SysRole;
 import com.xrcgs.iam.model.query.RolePageQuery;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 public interface SysRoleMapper extends BaseMapper<SysRole> {
     Page<SysRole> selectPage(Page<SysRole> page, @Param("q") RolePageQuery q);
+    List<Long> selectIdsByCodes(@Param("codes") List<String> codes);
 }
