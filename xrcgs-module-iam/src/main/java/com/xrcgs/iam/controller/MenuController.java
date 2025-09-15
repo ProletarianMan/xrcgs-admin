@@ -53,8 +53,8 @@ public class MenuController {
 
     // 根据角色编码集合获取菜单列表（平铺）
     @PostMapping("/tree/by-codes")
-    public List<MenuRouteVO> listByRoleCodes(@RequestBody List<String> roleCodes) {
-        return menuService.listByRoleCodes(roleCodes);
+    public R<List<MenuRouteVO>> listByRoleCodes(@RequestBody List<String> roleCodes) {
+        return R.ok(menuService.listByRoleCodes(roleCodes));
     }
 
     /**

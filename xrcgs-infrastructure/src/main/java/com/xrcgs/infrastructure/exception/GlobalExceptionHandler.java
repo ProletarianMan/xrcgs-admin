@@ -39,6 +39,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public R<Void> handleNotReadable(HttpMessageNotReadableException e) {
+        log.error(e.getMessage(), e);
         return R.fail(400, "请求体解析失败");
     }
 

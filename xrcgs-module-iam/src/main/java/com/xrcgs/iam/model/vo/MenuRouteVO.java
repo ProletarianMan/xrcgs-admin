@@ -9,6 +9,7 @@ import lombok.Data;
 public class MenuRouteVO {
     private Long id;
     private Long parentId;
+    private Integer menuType;
     private String path;
     private String name;
     private String component;

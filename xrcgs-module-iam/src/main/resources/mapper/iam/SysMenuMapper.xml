@@ -73,6 +73,7 @@
             #{rid}
         </foreach>
           AND m.del_flag = 0
+          AND m.type IN ('DIR','MENU')
         ORDER BY m.rank ASC, m.id ASC
     </select>
 

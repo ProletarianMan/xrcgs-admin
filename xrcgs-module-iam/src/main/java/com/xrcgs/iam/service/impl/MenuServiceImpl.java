@@ -124,6 +124,7 @@ public class MenuServiceImpl implements MenuService {
             MenuRouteVO vo = new MenuRouteVO();
             vo.setId(menu.getId());
             vo.setParentId(menu.getParentId());
+            vo.setMenuType(0);  // 0是菜单3是按钮
             vo.setPath(menu.getPath());
             vo.setName(menu.getRouterName());
             vo.setComponent(menu.getComponent());

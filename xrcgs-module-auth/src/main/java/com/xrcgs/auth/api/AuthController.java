@@ -77,7 +77,7 @@ public class AuthController {
         return R.ok(LoginResponse.builder()
                 .username(principal.getUsername())
                 .nickname(nickname)
-                .token(access)
+                .accessToken(access)
                 .refreshToken(refresh)
                 .expires(props.getAccessTtlSeconds())
                 .roles(roleCodes)
@@ -108,7 +108,7 @@ public class AuthController {
 
     /** 刷新：用合法且未拉黑的 Refresh Token 换新 Access Token */
     @PostMapping("/refresh")
-    public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshRequest req) {
+    public ResponseEntity<R<TokenResponse>> refresh(@Valid @RequestBody RefreshRequest req) {
         String refreshToken = req.getRefreshToken();
 
         // 验证 refresh token
@@ -145,9 +145,9 @@ public class AuthController {
 
         // 生成新Token
         String newAccess = jwtUtil.generateAccessToken(db.getId(), username, db.getNickname(), roleCodes, perms);
-        return ResponseEntity.ok(TokenResponse.builder()
-                .token(newAccess)
+        return ResponseEntity.ok(R.ok(TokenResponse.builder()
+                .accessToken(newAccess)
                 .expires(props.getAccessTtlSeconds())
-                .build());
+                .build()));
     }
 }
