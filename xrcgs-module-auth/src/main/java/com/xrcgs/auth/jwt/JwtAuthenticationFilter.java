@@ -87,7 +87,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // 按钮权限
                 // perms: ["iam:user:list", ...] -> PERM_iam:user:list
-                Collection<String> perms = claims.get("perms", Collection.class);
+                Collection<String> perms = claims.get("permissions", Collection.class);
                 if (perms != null) {
                     for (String p : perms) {
                         auths.add(new SimpleGrantedAuthority("PERM_" + p));
