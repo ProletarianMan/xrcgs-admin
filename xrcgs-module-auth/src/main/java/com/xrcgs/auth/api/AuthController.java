@@ -145,8 +145,10 @@ public class AuthController {
 
         // 生成新Token
         String newAccess = jwtUtil.generateAccessToken(db.getId(), username, db.getNickname(), roleCodes, perms);
+        String newRefreshToken = jwtUtil.generateRefreshToken(db.getId(), username);
         return ResponseEntity.ok(R.ok(TokenResponse.builder()
                 .accessToken(newAccess)
+                .refreshToken(newRefreshToken)
                 .expires(props.getAccessTtlSeconds())
                 .build()));
     }
