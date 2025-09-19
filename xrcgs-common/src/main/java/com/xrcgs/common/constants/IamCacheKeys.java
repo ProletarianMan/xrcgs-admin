@@ -14,4 +14,10 @@ public interface IamCacheKeys {
     // 字典缓存：按 typeCode
     String DICT_TYPE = "dict:"; // + {typeCode}
 
+    // 部门树版本号，用于通知前端刷新组织架构缓存
+    String DEPT_TREE_VERSION = "iam:dept:treeVersion";
+
+    // 部门数据范围缓存前缀，+ {deptId}
+    String DEPT_SCOPE = "iam:dept:scope:";
+
 }

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xrcgs.iam.mapper.SysDeptMapper">
+
+    <resultMap id="DeptMap" type="com.xrcgs.iam.entity.SysDept">
+        <id property="id" column="id"/>
+        <result property="parentId" column="parent_id"/>
+        <result property="path" column="path"/>
+        <result property="name" column="name"/>
+        <result property="code" column="code"/>
+        <result property="status" column="status"/>
+        <result property="sortNo" column="sort_no"/>
+        <result property="leaderUserId" column="leader_user_id"/>
+        <result property="phone" column="phone"/>
+        <result property="email" column="email"/>
+        <result property="remark" column="remark"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="delFlag" column="del_flag"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, parent_id, path, name, code, status, sort_no, leader_user_id,
+        phone, email, remark, create_by, create_time, update_by, update_time, del_flag
+    </sql>
+
+    <select id="selectChildren" resultMap="DeptMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM sys_dept
+        WHERE parent_id = #{parentId}
+          AND del_flag = 0
+        ORDER BY sort_no ASC, id ASC
+    </select>
+
+    <select id="selectByPathPrefix" resultMap="DeptMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM sys_dept
+        WHERE path LIKE CONCAT(#{pathPrefix}, '%')
+          AND del_flag = 0
+        ORDER BY path ASC
+    </select>
+
+    <select id="selectIdsByPathPrefix" resultType="java.lang.Long">
+        SELECT id
+        FROM sys_dept
+        WHERE path LIKE CONCAT(#{pathPrefix}, '%')
+          AND del_flag = 0
+    </select>
+
+    <update id="updatePathPrefix">
+        UPDATE sys_dept
+        SET path = CONCAT(#{newPath}, SUBSTRING(path, CHAR_LENGTH(#{oldPath}) + 1)),
+            update_time = NOW()
+        WHERE path LIKE CONCAT(#{oldPath}, '%')
+    </update>
+
+    <select id="countChildren" resultType="java.lang.Long">
+        SELECT COUNT(1)
+        FROM sys_dept
+        WHERE parent_id = #{parentId}
+          AND del_flag = 0
+    </select>
+
+</mapper>
