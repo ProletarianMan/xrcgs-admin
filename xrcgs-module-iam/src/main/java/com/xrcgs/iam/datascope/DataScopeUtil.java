@@ -1,5 +1,8 @@
 package com.xrcgs.iam.datascope;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.iam.entity.SysDept;
@@ -121,7 +124,67 @@ public final class DataScopeUtil {
         }
     }
 
+    public static <T> void apply(LambdaQueryWrapper<T> wrapper,
+                                 EffectiveDataScope scope,
+                                 Long currentUserId,
+                                 SFunction<T, ?> creatorColumn,
+                                 SFunction<T, ?> deptColumn) {
+        if (wrapper == null || scope == null || scope.isAll()) {
+            return;
+        }
+        Set<Long> deptIds = scope.getDeptIds();
+        boolean hasDeptFilter = deptColumn != null && deptIds != null && !deptIds.isEmpty();
+        boolean hasSelfFilter = scope.isSelf() && creatorColumn != null && currentUserId != null;
+        if (!hasDeptFilter && !hasSelfFilter) {
+            wrapper.apply("1 = 0");
+            return;
+        }
+        if (hasDeptFilter && hasSelfFilter) {
+            wrapper.and(w -> w.eq(creatorColumn, currentUserId)
+                    .or()
+                    .in(deptColumn, deptIds));
+            return;
+        }
+        if (hasSelfFilter) {
+            wrapper.eq(creatorColumn, currentUserId);
+        } else {
+            wrapper.in(deptColumn, deptIds);
+        }
+    }
+
+    public static <T> void apply(QueryWrapper<T> wrapper,
+                                 EffectiveDataScope scope,
+                                 Long currentUserId,
+                                 String creatorColumn,
+                                 String deptColumn) {
+        if (wrapper == null || scope == null || scope.isAll()) {
+            return;
+        }
+        Set<Long> deptIds = scope.getDeptIds();
+        boolean hasDeptFilter = hasText(deptColumn) && deptIds != null && !deptIds.isEmpty();
+        boolean hasSelfFilter = scope.isSelf() && hasText(creatorColumn) && currentUserId != null;
+        if (!hasDeptFilter && !hasSelfFilter) {
+            wrapper.apply("1 = 0");
+            return;
+        }
+        if (hasDeptFilter && hasSelfFilter) {
+            wrapper.and(w -> w.eq(creatorColumn, currentUserId)
+                    .or()
+                    .in(deptColumn, deptIds));
+            return;
+        }
+        if (hasSelfFilter) {
+            wrapper.eq(creatorColumn, currentUserId);
+        } else {
+            wrapper.in(deptColumn, deptIds);
+        }
+    }
+
     public static long nullSafeVersion(Long version) {
         return version == null ? 0L : version;
+    }
+
+    private static boolean hasText(String text) {
+        return text != null && !text.trim().isEmpty();
     }
 }
