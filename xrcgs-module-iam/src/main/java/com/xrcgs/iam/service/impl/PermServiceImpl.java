@@ -1,6 +1,7 @@
 package com.xrcgs.iam.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.entity.SysMenu;
 import com.xrcgs.iam.entity.SysPermission;
 import com.xrcgs.iam.entity.SysRolePerm;
@@ -26,6 +27,7 @@ public class PermServiceImpl implements PermService {
     private final SysRolePermMapper rolePermMapper;
     private final SysPermissionMapper permissionMapper;
     private final AuthCacheService cache;
+    private final DataScopeManager dataScopeManager;
 
     @Override
     public Set<String> aggregatePermsByRoles(Set<Long> roleIds) {
@@ -82,5 +84,6 @@ public class PermServiceImpl implements PermService {
     @Override
     public void evictUserPerms(Long userId) {
         cache.evictUserPerms(userId);
+        dataScopeManager.evictUserDataScope(userId);
     }
 }

@@ -18,10 +18,16 @@ public class SysRole {
     private String name;
     private Integer status;
 
+    private Long deptId;
+
+    @TableField("extra_dept_ids")
+    private String extraDeptIds;
+
     @TableField("data_scope")
     private DataScope dataScope;
 
     /** CUSTOM 时存部门ID数组 JSON（如 [1,2,3]） */
+    @TableField("data_scope_ext")
     private String dataScopeExt;
 
     private String remark;

@@ -1,11 +1,13 @@
 package com.xrcgs.infrastructure.cache;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.common.constants.IamCacheKeys;
+import com.xrcgs.iam.datascope.EffectiveDataScope;
+import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.Resource;
 import java.time.Duration;
 import java.util.Set;
 
@@ -28,6 +30,9 @@ public class AuthCacheServiceImpl implements AuthCacheService {
     // ✅ 新增温和 TTL（可根据你实际调整） 菜单树和字典
     private static final Duration MENU_TREE_TTL = Duration.ofMinutes(10);
     private static final Duration DICT_TTL      = Duration.ofMinutes(30);
+    private static final Duration DATA_SCOPE_TTL = Duration.ofHours(8);
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 
     @Override
@@ -51,6 +56,44 @@ public class AuthCacheServiceImpl implements AuthCacheService {
     @Override
     public void evictUserPerms(Long userId) {
         stringRedisTemplate.delete(IamCacheKeys.AUTH_PERM_USER + userId);
+    }
+
+    @Override
+    public void cacheUserDataScope(Long userId, EffectiveDataScope scope) {
+        if (userId == null || scope == null) {
+            return;
+        }
+        try {
+            String json = OBJECT_MAPPER.writeValueAsString(scope);
+            stringRedisTemplate.opsForValue()
+                    .set(IamCacheKeys.AUTH_SCOPE_USER + userId, json, DATA_SCOPE_TTL);
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    public EffectiveDataScope getCachedUserDataScope(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        try {
+            String json = stringRedisTemplate.opsForValue()
+                    .get(IamCacheKeys.AUTH_SCOPE_USER + userId);
+            if (json == null || json.isBlank()) {
+                return null;
+            }
+            return OBJECT_MAPPER.readValue(json, EffectiveDataScope.class);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Override
+    public void evictUserDataScope(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        stringRedisTemplate.delete(IamCacheKeys.AUTH_SCOPE_USER + userId);
     }
 
     @Override
