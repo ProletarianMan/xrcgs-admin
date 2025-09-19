@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Result object describing the effective data scope of a user after
+ * 描述用户有效数据范围的结果对象
  * combining role/user level rules.
  */
 public class EffectiveDataScope {
