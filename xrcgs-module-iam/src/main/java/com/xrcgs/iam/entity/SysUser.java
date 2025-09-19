@@ -1,8 +1,10 @@
 package com.xrcgs.iam.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.xrcgs.iam.enums.DataScope;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -18,6 +20,17 @@ public class SysUser {
     private String password;
     private String nickname;
     private Boolean enabled;
+
+    private Long deptId;
+
+    @TableField("extra_dept_ids")
+    private String extraDeptIds;
+
+    @TableField("data_scope")
+    private DataScope dataScope;
+
+    @TableField("data_scope_ext")
+    private String dataScopeExt;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

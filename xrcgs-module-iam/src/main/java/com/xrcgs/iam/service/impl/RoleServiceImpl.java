@@ -3,6 +3,7 @@ package com.xrcgs.iam.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.entity.*;
 import com.xrcgs.iam.mapper.*;
 import com.xrcgs.iam.model.dto.RoleGrantMenuDTO;
@@ -26,6 +27,7 @@ public class RoleServiceImpl implements RoleService {
     private final SysRolePermMapper rolePermMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final AuthCacheService authCacheService;
+    private final DataScopeManager dataScopeManager;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -138,6 +140,7 @@ public class RoleServiceImpl implements RoleService {
                 Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getRoleId, roleId));
         for (SysUserRole ur : urs) {
             authCacheService.evictUserPerms(ur.getUserId());
+            dataScopeManager.evictUserDataScope(ur.getUserId());
         }
     }
 }
