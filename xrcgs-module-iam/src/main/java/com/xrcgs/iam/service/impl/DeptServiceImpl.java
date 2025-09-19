@@ -167,6 +167,7 @@ public class DeptServiceImpl implements DeptService {
             node.setPhone(dept.getPhone());
             node.setEmail(dept.getEmail());
             node.setRemark(dept.getRemark());
+            node.setCreateTime(dept.getCreateTime());
             map.put(dept.getId(), node);
         }
 

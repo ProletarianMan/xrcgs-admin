@@ -2,6 +2,7 @@ package com.xrcgs.iam.model.vo;
 
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,5 +22,6 @@ public class DeptTreeVO {
     private String phone;
     private String email;
     private String remark;
+    private LocalDateTime createTime;
     private final List<DeptTreeVO> children = new ArrayList<>();
 }
