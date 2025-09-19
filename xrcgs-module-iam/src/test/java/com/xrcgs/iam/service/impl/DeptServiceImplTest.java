@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -42,7 +43,7 @@ class DeptServiceImplTest {
     void setUp() {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment(anyString())).thenReturn(1L);
-        when(redisTemplate.delete(any(Collection.class))).thenReturn(1L);
+        when(redisTemplate.delete(ArgumentMatchers.<Collection<String>>any())).thenReturn(1L);
         deptService = new DeptServiceImpl(deptMapper, redisTemplate);
     }
 
@@ -76,7 +77,7 @@ class DeptServiceImplTest {
         assertEquals(1L, updated.getParentId());
 
         verify(valueOperations).increment(IamCacheKeys.DEPT_TREE_VERSION);
-        verify(redisTemplate).delete(argThat(keys -> keys.contains(IamCacheKeys.DEPT_SCOPE + "10")));
+        verify(redisTemplate).delete(ArgumentMatchers.<Collection<String>>argThat(keys -> keys.contains(IamCacheKeys.DEPT_SCOPE + "10")));
     }
 
     @Test
@@ -114,7 +115,7 @@ class DeptServiceImplTest {
         assertEquals("新名称", updated.getName());
 
         verify(valueOperations, atLeastOnce()).increment(IamCacheKeys.DEPT_TREE_VERSION);
-        verify(redisTemplate).delete(argThat(keys ->
+        verify(redisTemplate).delete(ArgumentMatchers.<Collection<String>>argThat(keys ->
                 keys.contains(IamCacheKeys.DEPT_SCOPE + "2") &&
                         keys.contains(IamCacheKeys.DEPT_SCOPE + "5")));
     }
@@ -165,7 +166,7 @@ class DeptServiceImplTest {
         deptService.delete(4L);
 
         verify(deptMapper).deleteById(4L);
-        verify(redisTemplate).delete(argThat(keys -> keys.contains(IamCacheKeys.DEPT_SCOPE + "4")));
+        verify(redisTemplate).delete(ArgumentMatchers.<Collection<String>>argThat(keys -> keys.contains(IamCacheKeys.DEPT_SCOPE + "4")));
     }
 
     @Test
