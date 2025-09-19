@@ -31,6 +31,8 @@ public class SysFile {
     private String status;      // FileStatus 枚举名
     private String errorMsg;
 
+    private Long deptId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

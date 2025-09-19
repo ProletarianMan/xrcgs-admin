@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.xrcgs.iam.datascope.DataScopeManager;
+import com.xrcgs.iam.datascope.DataScopeUtil;
+import com.xrcgs.iam.datascope.EffectiveDataScope;
 import com.xrcgs.file.config.FileProperties;
 import com.xrcgs.file.enums.FileStatus;
 import com.xrcgs.file.enums.FileType;
@@ -12,6 +15,7 @@ import com.xrcgs.file.model.entity.SysFile;
 import com.xrcgs.file.model.vo.FileVO;
 import com.xrcgs.file.service.SysFileService;
 import com.xrcgs.file.storage.FileStorage;
+import com.xrcgs.infrastructure.audit.UserIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -39,6 +43,8 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
     private final FileStorage storage;
     private final FileProperties props;
     private final SysFileMapper mapper;
+    private final DataScopeManager dataScopeManager;
+    private final UserIdProvider userIdProvider;
 
     /**
      * 文件上传
@@ -162,6 +168,9 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             qw.and(c -> c.like(SysFile::getOriginalName, keyword).or().like(SysFile::getSha256, keyword));
         }
         qw.ne(SysFile::getStatus, FileStatus.DELETED.name());
+        Long userId = userIdProvider.getCurrentUserId();
+        EffectiveDataScope scope = dataScopeManager.getEffectiveDataScope(userId);
+        DataScopeUtil.apply(qw, scope, userId, SysFile::getCreatedBy, SysFile::getDeptId);
         qw.orderByDesc(SysFile::getCreatedAt);
         return this.page(Page.of(page, size), qw);
     }
@@ -181,6 +190,9 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
                 .select("status", "COUNT(*) AS cnt", "COALESCE(SUM(size),0) AS totalSize")
                 .eq("biz_type", bizType)
                 .groupBy("status");
+        Long userId = userIdProvider.getCurrentUserId();
+        EffectiveDataScope scope = dataScopeManager.getEffectiveDataScope(userId);
+        DataScopeUtil.apply(qw, scope, userId, "created_by", "dept_id");
         return this.listMaps(qw);
     }
 
