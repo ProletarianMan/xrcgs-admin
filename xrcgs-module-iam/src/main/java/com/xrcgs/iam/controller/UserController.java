@@ -14,6 +14,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @Validated
 @RestController
 @RequestMapping("/api/iam/user")
@@ -28,6 +30,12 @@ public class UserController {
                                 @RequestParam(defaultValue = "1") long pageNo,
                                 @RequestParam(defaultValue = "10") long pageSize) {
         return R.ok(userService.page(query, pageNo, pageSize));
+    }
+
+    @GetMapping("/search-by-nickname")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:list')")
+    public R<List<UserVO>> searchByNickname(@RequestParam String nickname) {
+        return R.ok(userService.listByNicknameSuffix(nickname));
     }
 
     @GetMapping("/{id}")

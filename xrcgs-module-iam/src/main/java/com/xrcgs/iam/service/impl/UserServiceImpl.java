@@ -151,6 +151,19 @@ public class UserServiceImpl implements UserService {
         evictAuthCache(id);
     }
 
+    @Override
+    public List<UserVO> listByNicknameSuffix(String nickname) {
+        String normalized = normalize(nickname);
+        if (!StringUtils.hasText(normalized)) {
+            return Collections.emptyList();
+        }
+        List<SysUser> users = userMapper.selectByNicknameSuffix(normalized);
+        if (users == null || users.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return users.stream().map(this::toVO).collect(Collectors.toList());
+    }
+
     private SysUser requireExisting(Long id) {
         SysUser user = userMapper.selectById(id);
         if (user == null) {

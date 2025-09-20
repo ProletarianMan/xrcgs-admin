@@ -7,7 +7,11 @@ import com.xrcgs.iam.model.query.UserPageQuery;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface SysUserMapper extends BaseMapper<SysUser> {
     Page<SysUser> selectPage(Page<SysUser> page, @Param("q") UserPageQuery query);
+
+    List<SysUser> selectByNicknameSuffix(@Param("nickname") String nickname);
 }

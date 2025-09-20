@@ -5,6 +5,8 @@ import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
 import com.xrcgs.iam.model.vo.UserVO;
 
+import java.util.List;
+
 public interface UserService {
 
     Page<UserVO> page(UserPageQuery q, long pageNo, long pageSize);
@@ -18,5 +20,7 @@ public interface UserService {
     void delete(Long id);
 
     void updateEnabled(Long id, boolean enabled);
+
+    List<UserVO> listByNicknameSuffix(String nickname);
 }
 
