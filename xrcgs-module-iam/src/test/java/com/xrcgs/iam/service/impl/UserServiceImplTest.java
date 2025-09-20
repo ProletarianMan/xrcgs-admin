@@ -288,5 +288,46 @@ class UserServiceImplTest {
         when(userMapper.selectById(999L)).thenReturn(null);
         assertThrows(IllegalArgumentException.class, () -> userService.detail(999L));
     }
+
+    @Test
+    void listByNicknameSuffixShouldReturnConvertedUsers() {
+        SysUser user = new SysUser();
+        user.setId(30L);
+        user.setUsername("nickuser");
+        user.setNickname("Nick");
+        user.setEnabled(Boolean.TRUE);
+        user.setDeptId(7L);
+        user.setExtraDeptIds("[5,6]");
+        user.setDataScope(DataScope.CUSTOM);
+        user.setDataScopeExt("[101,102]");
+        user.setCreatedAt(LocalDateTime.now());
+        user.setUpdatedAt(LocalDateTime.now());
+
+        when(userMapper.selectByNicknameSuffix("Nick")).thenReturn(List.of(user));
+
+        List<UserVO> result = userService.listByNicknameSuffix(" Nick ");
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        UserVO vo = result.get(0);
+        assertEquals(user.getId(), vo.getId());
+        assertEquals(user.getUsername(), vo.getUsername());
+        assertEquals(user.getNickname(), vo.getNickname());
+        assertEquals(user.getEnabled(), vo.getEnabled());
+        assertEquals(user.getDeptId(), vo.getDeptId());
+        assertEquals(List.of(5L, 6L), vo.getExtraDeptIds());
+        assertEquals(DataScope.CUSTOM, vo.getDataScope());
+        assertEquals(List.of(101L, 102L), vo.getDataScopeDeptIds());
+        verify(userMapper).selectByNicknameSuffix("Nick");
+    }
+
+    @Test
+    void listByNicknameSuffixShouldReturnEmptyWhenNicknameBlank() {
+        List<UserVO> result = userService.listByNicknameSuffix("   ");
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verify(userMapper, never()).selectByNicknameSuffix(any());
+    }
 }
 

@@ -41,4 +41,22 @@
         ORDER BY id DESC
     </select>
 
+    <select id="selectByNicknameSuffix" resultType="com.xrcgs.iam.entity.SysUser">
+        SELECT
+            id,
+            username,
+            password,
+            nickname,
+            enabled,
+            dept_id AS deptId,
+            extra_dept_ids AS extraDeptIds,
+            data_scope AS dataScope,
+            data_scope_ext AS dataScopeExt,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM sys_user
+        WHERE nickname LIKE CONCAT(#{nickname}, '%')
+        ORDER BY id DESC
+    </select>
+
 </mapper>
