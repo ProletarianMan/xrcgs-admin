@@ -19,11 +19,17 @@ public class DeptTreeVO {
     private Integer status;
     private Integer sortNo;
     private String path;
-    private Long leaderUserId;
+    private LeaderUser leaderUser;
     private String phone;
     private String email;
     private String remark;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createTime;
     private final List<DeptTreeVO> children = new ArrayList<>();
+
+    @Data
+    public static class LeaderUser {
+        private Long id;
+        private String name;
+    }
 }

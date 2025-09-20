@@ -2,7 +2,9 @@ package com.xrcgs.iam.service.impl;
 
 import com.xrcgs.common.constants.IamCacheKeys;
 import com.xrcgs.iam.entity.SysDept;
+import com.xrcgs.iam.entity.SysUser;
 import com.xrcgs.iam.mapper.SysDeptMapper;
+import com.xrcgs.iam.mapper.SysUserMapper;
 import com.xrcgs.iam.model.dto.DeptUpsertDTO;
 import com.xrcgs.iam.model.vo.DeptTreeVO;
 import com.xrcgs.iam.model.vo.DeptVO;
@@ -32,6 +34,9 @@ class DeptServiceImplTest {
     private SysDeptMapper deptMapper;
 
     @Mock
+    private SysUserMapper userMapper;
+
+    @Mock
     private StringRedisTemplate redisTemplate;
 
     @Mock
@@ -44,7 +49,7 @@ class DeptServiceImplTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.increment(anyString())).thenReturn(1L);
         when(redisTemplate.delete(ArgumentMatchers.<Collection<String>>any())).thenReturn(1L);
-        deptService = new DeptServiceImpl(deptMapper, redisTemplate);
+        deptService = new DeptServiceImpl(deptMapper, userMapper, redisTemplate);
     }
 
     @Test
@@ -183,7 +188,18 @@ class DeptServiceImplTest {
         child.setName("子");
         child.setSortNo(2);
 
+        root.setLeaderUserId(100L);
+        child.setLeaderUserId(101L);
+
         when(deptMapper.selectList(any())).thenReturn(Arrays.asList(root, child));
+
+        SysUser rootLeader = new SysUser();
+        rootLeader.setId(100L);
+        rootLeader.setNickname("张三");
+        SysUser childLeader = new SysUser();
+        childLeader.setId(101L);
+        childLeader.setNickname("李四");
+        when(userMapper.selectBatchIds(anyCollection())).thenReturn(Arrays.asList(rootLeader, childLeader));
 
         List<DeptTreeVO> tree = deptService.tree(null);
         assertEquals(1, tree.size());
@@ -191,6 +207,13 @@ class DeptServiceImplTest {
         assertEquals("根", rootNode.getName());
         assertEquals(1, rootNode.getChildren().size());
         assertEquals("子", rootNode.getChildren().get(0).getName());
+        assertNotNull(rootNode.getLeaderUser());
+        assertEquals(100L, rootNode.getLeaderUser().getId());
+        assertEquals("张三", rootNode.getLeaderUser().getName());
+        DeptTreeVO childNode = rootNode.getChildren().get(0);
+        assertNotNull(childNode.getLeaderUser());
+        assertEquals(101L, childNode.getLeaderUser().getId());
+        assertEquals("李四", childNode.getLeaderUser().getName());
     }
 
     @Test

@@ -3,7 +3,9 @@ package com.xrcgs.iam.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.xrcgs.common.constants.IamCacheKeys;
 import com.xrcgs.iam.entity.SysDept;
+import com.xrcgs.iam.entity.SysUser;
 import com.xrcgs.iam.mapper.SysDeptMapper;
+import com.xrcgs.iam.mapper.SysUserMapper;
 import com.xrcgs.iam.model.dto.DeptUpsertDTO;
 import com.xrcgs.iam.model.vo.DeptTreeVO;
 import com.xrcgs.iam.model.vo.DeptVO;
@@ -21,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
@@ -29,6 +32,7 @@ import java.util.stream.Collectors;
 public class DeptServiceImpl implements DeptService {
 
     private final SysDeptMapper deptMapper;
+    private final SysUserMapper userMapper;
     private final StringRedisTemplate stringRedisTemplate;
 
     @Override
@@ -153,6 +157,29 @@ public class DeptServiceImpl implements DeptService {
     /* ----------------- helpers ----------------- */
 
     private List<DeptTreeVO> buildTree(List<SysDept> flat) {
+        Set<Long> leaderIds = flat.stream()
+                .map(SysDept::getLeaderUserId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, DeptTreeVO.LeaderUser> leaderUsers = Collections.emptyMap();
+        if (!leaderIds.isEmpty()) {
+            List<SysUser> users = userMapper.selectBatchIds(leaderIds);
+            if (users != null && !users.isEmpty()) {
+                Map<Long, DeptTreeVO.LeaderUser> temp = new HashMap<>(users.size());
+                for (SysUser user : users) {
+                    if (user == null || user.getId() == null) {
+                        continue;
+                    }
+                    DeptTreeVO.LeaderUser leaderUser = new DeptTreeVO.LeaderUser();
+                    leaderUser.setId(user.getId());
+                    String nickname = user.getNickname();
+                    String username = user.getUsername();
+                    leaderUser.setName(StringUtils.hasText(nickname) ? nickname : username);
+                    temp.put(user.getId(), leaderUser);
+                }
+                leaderUsers = temp;
+            }
+        }
         Map<Long, DeptTreeVO> map = new HashMap<>(flat.size());
         for (SysDept dept : flat) {
             DeptTreeVO node = new DeptTreeVO();
@@ -163,7 +190,8 @@ public class DeptServiceImpl implements DeptService {
             node.setStatus(dept.getStatus());
             node.setSortNo(dept.getSortNo());
             node.setPath(dept.getPath());
-            node.setLeaderUserId(dept.getLeaderUserId());
+            Long leaderUserId = dept.getLeaderUserId();
+            node.setLeaderUser(leaderUserId == null ? null : leaderUsers.get(leaderUserId));
             node.setPhone(dept.getPhone());
             node.setEmail(dept.getEmail());
             node.setRemark(dept.getRemark());
