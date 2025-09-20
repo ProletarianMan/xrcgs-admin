@@ -1,5 +1,6 @@
 package com.xrcgs.iam.model.vo;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.xrcgs.iam.enums.DataScope;
 import lombok.Data;
 
@@ -19,7 +20,9 @@ public class UserVO {
     private List<Long> extraDeptIds;
     private DataScope dataScope;
     private List<Long> dataScopeDeptIds;
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDateTime createdAt;
+    @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDateTime updatedAt;
 }
 
