@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xrcgs.iam.mapper.SysUserMapper">
+
+    <select id="selectPage" resultType="com.xrcgs.iam.entity.SysUser">
+        SELECT
+            id,
+            username,
+            password,
+            nickname,
+            enabled,
+            dept_id AS deptId,
+            extra_dept_ids AS extraDeptIds,
+            data_scope AS dataScope,
+            data_scope_ext AS dataScopeExt,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+        FROM sys_user
+        WHERE 1 = 1
+        <if test="q != null">
+            <if test="q.username != null and q.username != ''">
+                AND username LIKE CONCAT('%', #{q.username}, '%')
+            </if>
+            <if test="q.nickname != null and q.nickname != ''">
+                AND nickname LIKE CONCAT('%', #{q.nickname}, '%')
+            </if>
+            <if test="q.deptId != null">
+                AND dept_id = #{q.deptId}
+            </if>
+            <if test="q.enabled != null">
+                AND enabled = #{q.enabled}
+            </if>
+            <if test="q.startTime != null">
+                AND created_at &gt;= #{q.startTime}
+            </if>
+            <if test="q.endTime != null">
+                AND created_at &lt;= #{q.endTime}
+            </if>
+        </if>
+        ORDER BY id DESC
+    </select>
+
+</mapper>
