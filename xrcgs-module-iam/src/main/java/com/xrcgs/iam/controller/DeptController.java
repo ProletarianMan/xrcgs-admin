@@ -28,8 +28,9 @@ public class DeptController {
 
     @GetMapping("/tree")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dept:tree')")
-    public R<List<DeptTreeVO>> tree(@RequestParam(value = "status", required = false) Integer status) {
-        return R.ok(deptService.tree(status));
+    public R<List<DeptTreeVO>> tree(@RequestParam(value = "name", required = false) String name,
+                                    @RequestParam(value = "status", required = false) Integer status) {
+        return R.ok(deptService.tree(name, status));
     }
 
     @GetMapping("/{id}")
