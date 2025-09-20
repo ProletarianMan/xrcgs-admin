@@ -36,10 +36,12 @@ public class DeptServiceImpl implements DeptService {
     private final StringRedisTemplate stringRedisTemplate;
 
     @Override
-    public List<DeptTreeVO> tree(Integer status) {
+    public List<DeptTreeVO> tree(String name, Integer status) {
+        String keyword = StringUtils.hasText(name) ? name.trim() : null;
         List<SysDept> list = deptMapper.selectList(
                 Wrappers.<SysDept>lambdaQuery()
                         .eq(SysDept::getDelFlag, 0)
+                        .like(StringUtils.hasText(keyword), SysDept::getName, keyword)
                         .eq(status != null, SysDept::getStatus, status)
                         .orderByAsc(SysDept::getSortNo, SysDept::getId)
         );

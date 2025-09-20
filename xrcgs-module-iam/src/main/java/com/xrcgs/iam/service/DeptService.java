@@ -16,5 +16,5 @@ public interface DeptService {
 
     DeptVO detail(Long id);
 
-    List<DeptTreeVO> tree(Integer status);
+    List<DeptTreeVO> tree(String name, Integer status);
 }

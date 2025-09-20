@@ -201,7 +201,7 @@ class DeptServiceImplTest {
         childLeader.setNickname("李四");
         when(userMapper.selectBatchIds(anyCollection())).thenReturn(Arrays.asList(rootLeader, childLeader));
 
-        List<DeptTreeVO> tree = deptService.tree(null);
+        List<DeptTreeVO> tree = deptService.tree(null, null);
         assertEquals(1, tree.size());
         DeptTreeVO rootNode = tree.get(0);
         assertEquals("根", rootNode.getName());
