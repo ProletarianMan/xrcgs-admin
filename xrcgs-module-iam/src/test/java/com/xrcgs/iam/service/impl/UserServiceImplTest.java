@@ -54,6 +54,8 @@ class UserServiceImplTest {
         dto.setUsername(" admin ");
         dto.setPassword("plainPwd");
         dto.setNickname(" 管理员 ");
+        dto.setWechatId(" wechat_001 ");
+        dto.setPhone(" 13800138000 ");
         dto.setEnabled(true);
         dto.setDeptId(1L);
         dto.setExtraDeptIds(Arrays.asList(10L, 20L));
@@ -76,6 +78,8 @@ class UserServiceImplTest {
         SysUser saved = captor.getValue();
         assertEquals("admin", saved.getUsername());
         assertEquals("管理员", saved.getNickname());
+        assertEquals("wechat_001", saved.getWechatId());
+        assertEquals("13800138000", saved.getPhone());
         assertEquals("encodedPwd", saved.getPassword());
         assertEquals(Boolean.TRUE, saved.getEnabled());
         assertEquals(1L, saved.getDeptId());
@@ -103,6 +107,8 @@ class UserServiceImplTest {
         current.setId(10L);
         current.setUsername("old");
         current.setNickname("旧");
+        current.setWechatId("oldWechat");
+        current.setPhone("000111");
         current.setEnabled(Boolean.TRUE);
         current.setDeptId(2L);
         current.setExtraDeptIds("[1]");
@@ -117,6 +123,8 @@ class UserServiceImplTest {
         dto.setUsername(" new ");
         dto.setNickname(" 新 ");
         dto.setPassword("newPwd");
+        dto.setWechatId(" newWechat ");
+        dto.setPhone(" 111222333 ");
         dto.setEnabled(false);
         dto.setDeptId(3L);
         dto.setExtraDeptIds(Arrays.asList(5L, 6L));
@@ -131,6 +139,8 @@ class UserServiceImplTest {
         assertEquals(10L, updated.getId());
         assertEquals("new", updated.getUsername());
         assertEquals("新", updated.getNickname());
+        assertEquals("newWechat", updated.getWechatId());
+        assertEquals("111222333", updated.getPhone());
         assertEquals(Boolean.FALSE, updated.getEnabled());
         assertEquals(3L, updated.getDeptId());
         assertEquals("[5,6]", updated.getExtraDeptIds());
@@ -148,6 +158,8 @@ class UserServiceImplTest {
         current.setId(11L);
         current.setUsername("old");
         current.setNickname("旧");
+        current.setWechatId("keepWechat");
+        current.setPhone("keepPhone");
         current.setEnabled(Boolean.TRUE);
         current.setDeptId(4L);
         current.setExtraDeptIds("[3]");
@@ -174,6 +186,8 @@ class UserServiceImplTest {
         SysUser updated = captor.getValue();
         assertEquals(11L, updated.getId());
         assertNull(updated.getPassword());
+        assertEquals("keepWechat", updated.getWechatId());
+        assertEquals("keepPhone", updated.getPhone());
         assertEquals("[3]", updated.getExtraDeptIds());
         assertEquals(DataScope.CUSTOM, updated.getDataScope());
         assertEquals("[7]", updated.getDataScopeExt());
@@ -224,6 +238,8 @@ class UserServiceImplTest {
         record.setId(1L);
         record.setUsername("alice");
         record.setNickname("Alice");
+        record.setWechatId("wechatAlice");
+        record.setPhone("18800001111");
         record.setEnabled(Boolean.TRUE);
         record.setDeptId(9L);
         record.setExtraDeptIds("[30,40]");
@@ -251,6 +267,8 @@ class UserServiceImplTest {
         UserVO vo = result.getRecords().get(0);
         assertEquals("alice", vo.getUsername());
         assertEquals("Alice", vo.getNickname());
+        assertEquals("wechatAlice", vo.getWechatId());
+        assertEquals("18800001111", vo.getPhone());
         assertEquals(Boolean.TRUE, vo.getEnabled());
         assertEquals(9L, vo.getDeptId());
         assertEquals(List.of(30L, 40L), vo.getExtraDeptIds());
@@ -266,6 +284,8 @@ class UserServiceImplTest {
         record.setId(8L);
         record.setUsername("bob");
         record.setNickname("Bob");
+        record.setWechatId("wechatBob");
+        record.setPhone("19900002222");
         record.setEnabled(Boolean.FALSE);
         record.setDeptId(12L);
         record.setExtraDeptIds("[1,2]");
@@ -279,6 +299,8 @@ class UserServiceImplTest {
         UserVO vo = userService.detail(8L);
         assertEquals("bob", vo.getUsername());
         assertEquals(Boolean.FALSE, vo.getEnabled());
+        assertEquals("wechatBob", vo.getWechatId());
+        assertEquals("19900002222", vo.getPhone());
         assertEquals(List.of(1L, 2L), vo.getExtraDeptIds());
         assertEquals(Collections.emptyList(), vo.getDataScopeDeptIds());
     }
@@ -295,6 +317,8 @@ class UserServiceImplTest {
         user.setId(30L);
         user.setUsername("nickuser");
         user.setNickname("Nick");
+        user.setWechatId("wechatNick");
+        user.setPhone("17700003333");
         user.setEnabled(Boolean.TRUE);
         user.setDeptId(7L);
         user.setExtraDeptIds("[5,6]");
@@ -313,6 +337,8 @@ class UserServiceImplTest {
         assertEquals(user.getId(), vo.getId());
         assertEquals(user.getUsername(), vo.getUsername());
         assertEquals(user.getNickname(), vo.getNickname());
+        assertEquals(user.getWechatId(), vo.getWechatId());
+        assertEquals(user.getPhone(), vo.getPhone());
         assertEquals(user.getEnabled(), vo.getEnabled());
         assertEquals(user.getDeptId(), vo.getDeptId());
         assertEquals(List.of(5L, 6L), vo.getExtraDeptIds());

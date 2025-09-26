@@ -15,6 +15,8 @@ public class UserVO {
     private Long id;
     private String username;
     private String nickname;
+    private String wechatId;
+    private String phone;
     private Boolean enabled;
     private Long deptId;
     private List<Long> extraDeptIds;

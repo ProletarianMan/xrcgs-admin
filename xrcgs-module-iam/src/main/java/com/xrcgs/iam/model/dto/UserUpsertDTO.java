@@ -32,6 +32,12 @@ public class UserUpsertDTO {
     @Size(max = 64, message = "昵称长度不能超过64个字符")
     private String nickname;
 
+    @Size(max = 64, message = "微信号长度不能超过64个字符")
+    private String wechatId;
+
+    @Size(max = 32, message = "手机号长度不能超过32个字符")
+    private String phone;
+
     private Boolean enabled;
 
     private Long deptId;
