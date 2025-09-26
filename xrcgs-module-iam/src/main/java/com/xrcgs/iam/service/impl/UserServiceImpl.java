@@ -79,6 +79,8 @@ public class UserServiceImpl implements UserService {
         SysUser entity = new SysUser();
         entity.setUsername(username);
         entity.setNickname(nickname);
+        entity.setWechatId(normalizeAllowEmpty(dto.getWechatId()));
+        entity.setPhone(normalizeAllowEmpty(dto.getPhone()));
         entity.setPassword(passwordEncoder.encode(rawPassword));
         entity.setEnabled(dto.getEnabled() != null ? dto.getEnabled() : Boolean.TRUE);
         entity.setDeptId(dto.getDeptId());
@@ -112,6 +114,8 @@ public class UserServiceImpl implements UserService {
         update.setId(id);
         update.setUsername(username);
         update.setNickname(nickname);
+        update.setWechatId(dto.getWechatId() != null ? normalizeAllowEmpty(dto.getWechatId()) : current.getWechatId());
+        update.setPhone(dto.getPhone() != null ? normalizeAllowEmpty(dto.getPhone()) : current.getPhone());
         update.setEnabled(dto.getEnabled() != null ? dto.getEnabled() : current.getEnabled());
         update.setDeptId(dto.getDeptId());
 
@@ -219,6 +223,8 @@ public class UserServiceImpl implements UserService {
         vo.setId(entity.getId());
         vo.setUsername(entity.getUsername());
         vo.setNickname(entity.getNickname());
+        vo.setWechatId(entity.getWechatId());
+        vo.setPhone(entity.getPhone());
         vo.setEnabled(entity.getEnabled());
         vo.setDeptId(entity.getDeptId());
         vo.setExtraDeptIds(parseList(entity.getExtraDeptIds()));
@@ -235,6 +241,13 @@ public class UserServiceImpl implements UserService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String normalizeAllowEmpty(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.trim();
     }
 
     private void evictAuthCache(Long userId) {

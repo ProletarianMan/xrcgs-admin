@@ -5,6 +5,7 @@
 - `001_create_sys_dept.sql`：创建部门表 `sys_dept`，使用物化路径维护组织层级。
 - `002_alter_sys_user_role_add_dept_scope.sql`：为 `sys_user`、`sys_role` 补齐部门/数据范围字段，并确保 JSON 字段类型正确。
 - `003_seed_sys_dept_and_path_backfill.sql`：示例部门数据、部门迁移示例及通用 path 回填脚本。
+- `004_create_or_alter_sys_user_contact.sql`：提供包含 `wechat_id`、`phone` 字段的完整 `sys_user` 建表语句，并在增量场景下补齐联系方式列。
 
 ## `path` 字段的物化路径语义
 

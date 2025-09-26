@@ -19,6 +19,10 @@ public class SysUser {
     private String username;
     private String password;
     private String nickname;
+    @TableField("wechat_id")
+    private String wechatId;
+    @TableField("phone")
+    private String phone;
     private Boolean enabled;
 
     private Long deptId;
