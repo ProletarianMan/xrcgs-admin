@@ -18,7 +18,7 @@ public class UserVO {
     private String wechatId;
     private String phone;
     private Boolean enabled;
-    private Long deptId;
+    private DeptBriefVO dept;
     private List<Long> extraDeptIds;
     private DataScope dataScope;
     private List<Long> dataScopeDeptIds;
@@ -27,4 +27,3 @@ public class UserVO {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDateTime updatedAt;
 }
-

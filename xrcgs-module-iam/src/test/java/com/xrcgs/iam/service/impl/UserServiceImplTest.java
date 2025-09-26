@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
+import com.xrcgs.iam.entity.SysDept;
 import com.xrcgs.iam.entity.SysUser;
 import com.xrcgs.iam.enums.DataScope;
+import com.xrcgs.iam.mapper.SysDeptMapper;
 import com.xrcgs.iam.mapper.SysUserMapper;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
@@ -36,6 +38,9 @@ class UserServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
+    private SysDeptMapper sysDeptMapper;
+
+    @Mock
     private AuthCacheService authCacheService;
 
     @Mock
@@ -45,7 +50,7 @@ class UserServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userMapper, passwordEncoder, authCacheService, dataScopeManager, new ObjectMapper());
+        userService = new UserServiceImpl(userMapper, sysDeptMapper, passwordEncoder, authCacheService, dataScopeManager, new ObjectMapper());
     }
 
     @Test
@@ -254,6 +259,10 @@ class UserServiceImplTest {
         mpPage.setRecords(Collections.singletonList(record));
 
         when(userMapper.selectPage(any(Page.class), any())).thenReturn(mpPage);
+        SysDept dept = new SysDept();
+        dept.setId(9L);
+        dept.setName("研发部");
+        when(sysDeptMapper.selectBatchIds(List.of(9L))).thenReturn(List.of(dept));
 
         UserPageQuery query = new UserPageQuery();
         query.setUsername("alice");
@@ -270,7 +279,9 @@ class UserServiceImplTest {
         assertEquals("wechatAlice", vo.getWechatId());
         assertEquals("18800001111", vo.getPhone());
         assertEquals(Boolean.TRUE, vo.getEnabled());
-        assertEquals(9L, vo.getDeptId());
+        assertNotNull(vo.getDept());
+        assertEquals(9L, vo.getDept().getId());
+        assertEquals("研发部", vo.getDept().getName());
         assertEquals(List.of(30L, 40L), vo.getExtraDeptIds());
         assertEquals(DataScope.CUSTOM, vo.getDataScope());
         assertEquals(List.of(50L), vo.getDataScopeDeptIds());
@@ -295,12 +306,19 @@ class UserServiceImplTest {
         record.setUpdatedAt(LocalDateTime.now());
 
         when(userMapper.selectById(8L)).thenReturn(record);
+        SysDept dept = new SysDept();
+        dept.setId(12L);
+        dept.setName("财务部");
+        when(sysDeptMapper.selectBatchIds(List.of(12L))).thenReturn(List.of(dept));
 
         UserVO vo = userService.detail(8L);
         assertEquals("bob", vo.getUsername());
         assertEquals(Boolean.FALSE, vo.getEnabled());
         assertEquals("wechatBob", vo.getWechatId());
         assertEquals("19900002222", vo.getPhone());
+        assertNotNull(vo.getDept());
+        assertEquals(12L, vo.getDept().getId());
+        assertEquals("财务部", vo.getDept().getName());
         assertEquals(List.of(1L, 2L), vo.getExtraDeptIds());
         assertEquals(Collections.emptyList(), vo.getDataScopeDeptIds());
     }
@@ -328,6 +346,10 @@ class UserServiceImplTest {
         user.setUpdatedAt(LocalDateTime.now());
 
         when(userMapper.selectByNicknameSuffix("Nick")).thenReturn(List.of(user));
+        SysDept dept = new SysDept();
+        dept.setId(7L);
+        dept.setName("市场部");
+        when(sysDeptMapper.selectBatchIds(List.of(7L))).thenReturn(List.of(dept));
 
         List<UserVO> result = userService.listByNicknameSuffix(" Nick ");
 
@@ -340,7 +362,9 @@ class UserServiceImplTest {
         assertEquals(user.getWechatId(), vo.getWechatId());
         assertEquals(user.getPhone(), vo.getPhone());
         assertEquals(user.getEnabled(), vo.getEnabled());
-        assertEquals(user.getDeptId(), vo.getDeptId());
+        assertNotNull(vo.getDept());
+        assertEquals(user.getDeptId(), vo.getDept().getId());
+        assertEquals("市场部", vo.getDept().getName());
         assertEquals(List.of(5L, 6L), vo.getExtraDeptIds());
         assertEquals(DataScope.CUSTOM, vo.getDataScope());
         assertEquals(List.of(101L, 102L), vo.getDataScopeDeptIds());
