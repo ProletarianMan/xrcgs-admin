@@ -8,9 +8,12 @@ import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.entity.SysUser;
 import com.xrcgs.iam.enums.DataScope;
+import com.xrcgs.iam.entity.SysDept;
+import com.xrcgs.iam.mapper.SysDeptMapper;
 import com.xrcgs.iam.mapper.SysUserMapper;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
+import com.xrcgs.iam.model.vo.DeptBriefVO;
 import com.xrcgs.iam.model.vo.UserVO;
 import com.xrcgs.iam.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +24,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -32,6 +36,7 @@ public class UserServiceImpl implements UserService {
     };
 
     private final SysUserMapper userMapper;
+    private final SysDeptMapper deptMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuthCacheService authCacheService;
     private final DataScopeManager dataScopeManager;
@@ -47,14 +52,18 @@ public class UserServiceImpl implements UserService {
             result.setRecords(Collections.emptyList());
             return result;
         }
-        result.setRecords(entityPage.getRecords().stream().map(this::toVO).collect(Collectors.toList()));
+        List<UserVO> records = entityPage.getRecords().stream().map(this::toVO).collect(Collectors.toList());
+        fillDeptInfo(records);
+        result.setRecords(records);
         return result;
     }
 
     @Override
     public UserVO detail(Long id) {
         SysUser user = requireExisting(id);
-        return toVO(user);
+        UserVO vo = toVO(user);
+        fillDeptInfo(Collections.singletonList(vo));
+        return vo;
     }
 
     @Override
@@ -165,7 +174,9 @@ public class UserServiceImpl implements UserService {
         if (users == null || users.isEmpty()) {
             return Collections.emptyList();
         }
-        return users.stream().map(this::toVO).collect(Collectors.toList());
+        List<UserVO> vos = users.stream().map(this::toVO).collect(Collectors.toList());
+        fillDeptInfo(vos);
+        return vos;
     }
 
     private SysUser requireExisting(Long id) {
@@ -226,13 +237,54 @@ public class UserServiceImpl implements UserService {
         vo.setWechatId(entity.getWechatId());
         vo.setPhone(entity.getPhone());
         vo.setEnabled(entity.getEnabled());
-        vo.setDeptId(entity.getDeptId());
+        if (entity.getDeptId() != null) {
+            DeptBriefVO dept = new DeptBriefVO();
+            dept.setId(entity.getDeptId());
+            vo.setDept(dept);
+        }
         vo.setExtraDeptIds(parseList(entity.getExtraDeptIds()));
         vo.setDataScope(entity.getDataScope());
         vo.setDataScopeDeptIds(parseList(entity.getDataScopeExt()));
         vo.setCreatedAt(entity.getCreatedAt());
         vo.setUpdatedAt(entity.getUpdatedAt());
         return vo;
+    }
+
+    private void fillDeptInfo(List<UserVO> users) {
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        List<Long> deptIds = users.stream()
+                .map(UserVO::getDept)
+                .filter(Objects::nonNull)
+                .map(DeptBriefVO::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (deptIds.isEmpty()) {
+            return;
+        }
+        Map<Long, SysDept> deptMap = loadDeptMap(deptIds);
+        users.stream()
+                .map(UserVO::getDept)
+                .filter(Objects::nonNull)
+                .forEach(dept -> {
+                    SysDept entity = deptMap.get(dept.getId());
+                    if (entity != null) {
+                        dept.setName(entity.getName());
+                    }
+                });
+    }
+
+    private Map<Long, SysDept> loadDeptMap(List<Long> deptIds) {
+        if (deptIds == null || deptIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<SysDept> depts = deptMapper.selectBatchIds(deptIds);
+        if (depts == null || depts.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return depts.stream().collect(Collectors.toMap(SysDept::getId, dept -> dept, (a, b) -> a));
     }
 
     private String normalize(String value) {
