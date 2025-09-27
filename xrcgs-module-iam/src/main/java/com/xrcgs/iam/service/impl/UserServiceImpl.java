@@ -6,11 +6,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
-import com.xrcgs.iam.entity.SysUser;
-import com.xrcgs.iam.enums.DataScope;
 import com.xrcgs.iam.entity.SysDept;
+import com.xrcgs.iam.entity.SysUser;
+import com.xrcgs.iam.entity.SysUserRole;
+import com.xrcgs.iam.enums.DataScope;
 import com.xrcgs.iam.mapper.SysDeptMapper;
 import com.xrcgs.iam.mapper.SysUserMapper;
+import com.xrcgs.iam.mapper.SysUserRoleMapper;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
 import com.xrcgs.iam.model.vo.DeptBriefVO;
@@ -41,6 +43,7 @@ public class UserServiceImpl implements UserService {
     private final AuthCacheService authCacheService;
     private final DataScopeManager dataScopeManager;
     private final ObjectMapper objectMapper;
+    private final SysUserRoleMapper userRoleMapper;
 
     @Override
     public Page<UserVO> page(UserPageQuery q, long pageNo, long pageSize) {
@@ -101,6 +104,7 @@ public class UserServiceImpl implements UserService {
         entity.setDataScopeExt(serializeDataScopeExt(dataScope, dto.getDataScopeDeptIds()));
 
         userMapper.insert(entity);
+        saveUserRoles(entity.getId(), dto.getRoleIds());
         return entity.getId();
     }
 
@@ -144,6 +148,8 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.updateById(update);
+        userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, id));
+        saveUserRoles(id, dto.getRoleIds());
         evictAuthCache(id);
     }
 
@@ -229,6 +235,26 @@ public class UserServiceImpl implements UserService {
             return null;
         }
         return serializeList(deptIds);
+    }
+
+    private void saveUserRoles(Long userId, List<Long> roleIds) {
+        if (userId == null || roleIds == null || roleIds.isEmpty()) {
+            return;
+        }
+        List<SysUserRole> relations = roleIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(roleId -> {
+                    SysUserRole relation = new SysUserRole();
+                    relation.setUserId(userId);
+                    relation.setRoleId(roleId);
+                    return relation;
+                })
+                .collect(Collectors.toList());
+        if (relations.isEmpty()) {
+            return;
+        }
+        relations.forEach(userRoleMapper::insert);
     }
 
     private UserVO toVO(SysUser entity) {

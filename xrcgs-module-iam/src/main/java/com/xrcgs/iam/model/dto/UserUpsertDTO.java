@@ -56,5 +56,10 @@ public class UserUpsertDTO {
      * 数据范围扩展，CUSTOM 模式下生效
      */
     private List<Long> dataScopeDeptIds;
+
+    /**
+     * 关联角色 ID 列表
+     */
+    private List<Long> roleIds;
 }
 
