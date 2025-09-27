@@ -72,7 +72,7 @@ public class UserController {
 
     @PutMapping("/{id}/enable")
     @OpLog("启用用户")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:enable')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:update')")
     public R<Boolean> enable(@PathVariable @NotNull Long id) {
         userService.updateEnabled(id, true);
         return R.ok(true);
@@ -80,7 +80,7 @@ public class UserController {
 
     @PutMapping("/{id}/disable")
     @OpLog("停用用户")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:disable')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:update')")
     public R<Boolean> disable(@PathVariable @NotNull Long id) {
         userService.updateEnabled(id, false);
         return R.ok(true);
