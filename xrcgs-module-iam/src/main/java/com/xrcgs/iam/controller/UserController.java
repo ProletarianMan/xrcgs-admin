@@ -2,6 +2,8 @@ package com.xrcgs.iam.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xrcgs.common.core.R;
+import com.xrcgs.iam.model.dto.UserAssignRoleDTO;
+import com.xrcgs.iam.model.dto.UserResetPasswordDTO;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
 import com.xrcgs.iam.model.vo.UserVO;
@@ -59,6 +61,24 @@ public class UserController {
                              @Valid @RequestBody UserUpsertDTO dto) {
         dto.setId(id);
         userService.update(id, dto);
+        return R.ok(true);
+    }
+
+    @PutMapping("/{id}/password")
+    @OpLog("重置用户密码")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:update')")
+    public R<Boolean> resetPassword(@PathVariable @NotNull Long id,
+                                    @Valid @RequestBody UserResetPasswordDTO dto) {
+        userService.resetPassword(id, dto.getPassword());
+        return R.ok(true);
+    }
+
+    @PutMapping("/{id}/roles")
+    @OpLog("分配用户角色")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:update')")
+    public R<Boolean> assignRoles(@PathVariable @NotNull Long id,
+                                  @Valid @RequestBody UserAssignRoleDTO dto) {
+        userService.assignRoles(id, dto.getRoleIds());
         return R.ok(true);
     }
 

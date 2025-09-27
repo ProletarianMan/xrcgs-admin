@@ -21,6 +21,10 @@ public interface UserService {
 
     void updateEnabled(Long id, boolean enabled);
 
+    void resetPassword(Long id, String rawPassword);
+
+    void assignRoles(Long id, List<Long> roleIds);
+
     List<UserVO> listByNicknameSuffix(String nickname);
 }
 
