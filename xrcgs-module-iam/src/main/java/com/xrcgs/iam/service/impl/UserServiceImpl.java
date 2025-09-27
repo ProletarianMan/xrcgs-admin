@@ -90,6 +90,7 @@ public class UserServiceImpl implements UserService {
         entity.setNickname(nickname);
         entity.setWechatId(normalizeAllowEmpty(dto.getWechatId()));
         entity.setPhone(normalizeAllowEmpty(dto.getPhone()));
+        entity.setGender(dto.getGender());
         entity.setPassword(passwordEncoder.encode(rawPassword));
         entity.setEnabled(dto.getEnabled() != null ? dto.getEnabled() : Boolean.TRUE);
         entity.setDeptId(dto.getDeptId());
@@ -125,6 +126,7 @@ public class UserServiceImpl implements UserService {
         update.setNickname(nickname);
         update.setWechatId(dto.getWechatId() != null ? normalizeAllowEmpty(dto.getWechatId()) : current.getWechatId());
         update.setPhone(dto.getPhone() != null ? normalizeAllowEmpty(dto.getPhone()) : current.getPhone());
+        update.setGender(dto.getGender() != null ? dto.getGender() : current.getGender());
         update.setEnabled(dto.getEnabled() != null ? dto.getEnabled() : current.getEnabled());
         update.setDeptId(dto.getDeptId());
 
@@ -236,6 +238,7 @@ public class UserServiceImpl implements UserService {
         vo.setNickname(entity.getNickname());
         vo.setWechatId(entity.getWechatId());
         vo.setPhone(entity.getPhone());
+        vo.setGender(entity.getGender());
         vo.setEnabled(entity.getEnabled());
         if (entity.getDeptId() != null) {
             DeptBriefVO dept = new DeptBriefVO();

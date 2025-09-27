@@ -1,8 +1,8 @@
 -- -----------------------------------------------------------------------------
 -- Create or alter: sys_user contact columns
 -- -----------------------------------------------------------------------------
--- 提供包含 wechat_id、phone 字段的完整 sys_user 建表语句，
--- 并在增量场景下补齐缺失的联系方式列。
+-- 提供包含 wechat_id、phone、gender 字段的完整 sys_user 建表语句，
+-- 并在增量场景下补齐缺失的联系方式及性别列。
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS `sys_user` (
@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
     `nickname` VARCHAR(64) NOT NULL COMMENT '昵称',
     `wechat_id` VARCHAR(64) NULL DEFAULT NULL COMMENT '微信号',
     `phone` VARCHAR(32) NULL DEFAULT NULL COMMENT '联系电话',
+    `gender` TINYINT(1) NULL DEFAULT NULL COMMENT '性别：0-女，1-男',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
     `dept_id` BIGINT UNSIGNED NULL DEFAULT NULL COMMENT '主部门 ID',
     `extra_dept_ids` JSON NULL COMMENT '附加部门 ID 列表（JSON 数组）',
@@ -26,4 +27,5 @@ CREATE TABLE IF NOT EXISTS `sys_user` (
 
 ALTER TABLE `sys_user`
     ADD COLUMN IF NOT EXISTS `wechat_id` VARCHAR(64) NULL DEFAULT NULL COMMENT '微信号' AFTER `nickname`,
-    ADD COLUMN IF NOT EXISTS `phone` VARCHAR(32) NULL DEFAULT NULL COMMENT '联系电话' AFTER `wechat_id`;
+    ADD COLUMN IF NOT EXISTS `phone` VARCHAR(32) NULL DEFAULT NULL COMMENT '联系电话' AFTER `wechat_id`,
+    ADD COLUMN IF NOT EXISTS `gender` TINYINT(1) NULL DEFAULT NULL COMMENT '性别：0-女，1-男' AFTER `phone`;
