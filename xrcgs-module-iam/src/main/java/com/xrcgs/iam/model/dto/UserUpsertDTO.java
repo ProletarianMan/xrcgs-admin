@@ -20,7 +20,6 @@ public class UserUpsertDTO {
      */
     private Long id;
 
-    @NotBlank(message = "用户名不能为空")
     @Size(max = 64, message = "用户名长度不能超过64个字符")
     private String username;
 
@@ -30,7 +29,6 @@ public class UserUpsertDTO {
     @Size(min = 6, max = 128, message = "密码长度需在6~128个字符之间")
     private String password;
 
-    @NotBlank(message = "昵称不能为空")
     @Size(max = 64, message = "昵称长度不能超过64个字符")
     private String nickname;
 
