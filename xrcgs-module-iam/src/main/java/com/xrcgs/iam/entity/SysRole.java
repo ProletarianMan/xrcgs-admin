@@ -1,6 +1,7 @@
 package com.xrcgs.iam.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.xrcgs.iam.enums.DataScope;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -34,11 +35,13 @@ public class SysRole {
     private Integer sortNo;
     private Long createBy;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
     private Long updateBy;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
