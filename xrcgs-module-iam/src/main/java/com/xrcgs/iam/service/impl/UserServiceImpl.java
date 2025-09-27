@@ -163,6 +163,30 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void resetPassword(Long id, String rawPassword) {
+        requireExisting(id);
+        String normalized = normalize(rawPassword);
+        if (!StringUtils.hasText(normalized)) {
+            throw new IllegalArgumentException("密码不能为空");
+        }
+        SysUser update = new SysUser();
+        update.setId(id);
+        update.setPassword(passwordEncoder.encode(normalized));
+        userMapper.updateById(update);
+        evictAuthCache(id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignRoles(Long id, List<Long> roleIds) {
+        requireExisting(id);
+        userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, id));
+        saveUserRoles(id, roleIds);
+        evictAuthCache(id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         requireExisting(id);
         userMapper.deleteById(id);
