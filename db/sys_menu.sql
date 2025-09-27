@@ -1,0 +1,21 @@
+CREATE TABLE `sys_menu` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `parent_id` bigint DEFAULT '0' COMMENT '父级ID',
+  `title` varchar(64) NOT NULL COMMENT '菜单标题',
+  `path` varchar(128) DEFAULT NULL COMMENT '前端路由path',
+  `router_name` varchar(64) DEFAULT NULL COMMENT '前端路由 name 属性',
+  `component` varchar(128) DEFAULT NULL COMMENT '前端组件路径',
+  `type` varchar(16) NOT NULL COMMENT 'DIR/MENU/BUTTON/API',
+  `perms` varchar(128) DEFAULT NULL COMMENT '权限标识，例: iam:user:list',
+  `icon` varchar(64) DEFAULT NULL,
+  `rank` int DEFAULT '0' COMMENT '菜单排序权重',
+  `keep_alive` tinyint DEFAULT '0' COMMENT '是否开启 keepAlive：0否 1是',
+  `show_parent` tinyint DEFAULT '0' COMMENT '子路由是否显示父级：0否 1是',
+  `visible` tinyint DEFAULT '1' COMMENT '是否显示',
+  `status` tinyint DEFAULT '1' COMMENT '是否启用',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `del_flag` tinyint DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_menu_perms` (`perms`)
+) ENGINE=InnoDB AUTO_INCREMENT=3010 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='菜单权限表';
