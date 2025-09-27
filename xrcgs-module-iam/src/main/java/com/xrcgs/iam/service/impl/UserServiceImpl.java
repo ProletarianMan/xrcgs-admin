@@ -189,6 +189,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         requireExisting(id);
+        userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, id));
         userMapper.deleteById(id);
         evictAuthCache(id);
     }
