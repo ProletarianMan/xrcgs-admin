@@ -23,6 +23,7 @@ public class UserVO {
     private List<Long> extraDeptIds;
     private DataScope dataScope;
     private List<Long> dataScopeDeptIds;
+    private List<RoleBriefVO> roles;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDateTime createdAt;
     @JsonFormat(pattern = "yyyy-MM-dd")

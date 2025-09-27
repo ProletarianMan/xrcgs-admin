@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.entity.SysDept;
+import com.xrcgs.iam.entity.SysRole;
 import com.xrcgs.iam.entity.SysUser;
+import com.xrcgs.iam.entity.SysUserRole;
 import com.xrcgs.iam.enums.DataScope;
 import com.xrcgs.iam.mapper.SysDeptMapper;
+import com.xrcgs.iam.mapper.SysRoleMapper;
 import com.xrcgs.iam.mapper.SysUserMapper;
+import com.xrcgs.iam.mapper.SysUserRoleMapper;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
 import com.xrcgs.iam.model.vo.UserVO;
@@ -26,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,16 +46,22 @@ class UserServiceImplTest {
     private SysDeptMapper sysDeptMapper;
 
     @Mock
+    private SysRoleMapper roleMapper;
+
+    @Mock
     private AuthCacheService authCacheService;
 
     @Mock
     private DataScopeManager dataScopeManager;
 
+    @Mock
+    private SysUserRoleMapper userRoleMapper;
+
     private UserServiceImpl userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserServiceImpl(userMapper, sysDeptMapper, passwordEncoder, authCacheService, dataScopeManager, new ObjectMapper());
+        userService = new UserServiceImpl(userMapper, sysDeptMapper, roleMapper, passwordEncoder, authCacheService, dataScopeManager, new ObjectMapper(), userRoleMapper);
     }
 
     @Test
@@ -266,11 +277,12 @@ class UserServiceImplTest {
         mpPage.setPages(1);
         mpPage.setRecords(Collections.singletonList(record));
 
-        when(userMapper.selectPage(any(Page.class), any())).thenReturn(mpPage);
+        when(userMapper.selectPage(any(Page.class), any(UserPageQuery.class))).thenReturn(mpPage);
         SysDept dept = new SysDept();
         dept.setId(9L);
         dept.setName("研发部");
         when(sysDeptMapper.selectBatchIds(List.of(9L))).thenReturn(List.of(dept));
+        when(userRoleMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         UserPageQuery query = new UserPageQuery();
         query.setUsername("alice");
@@ -296,6 +308,51 @@ class UserServiceImplTest {
         assertEquals(List.of(50L), vo.getDataScopeDeptIds());
         assertEquals(record.getCreatedAt(), vo.getCreatedAt());
         assertEquals(record.getUpdatedAt(), vo.getUpdatedAt());
+        assertEquals(Collections.emptyList(), vo.getRoles());
+    }
+
+    @Test
+    void pageShouldIncludeRoles() {
+        SysUser record = new SysUser();
+        record.setId(2L);
+        record.setUsername("carol");
+        record.setNickname("Carol");
+
+        Page<SysUser> mpPage = new Page<>(1, 10);
+        mpPage.setTotal(1);
+        mpPage.setPages(1);
+        mpPage.setRecords(List.of(record));
+
+        when(userMapper.selectPage(any(Page.class), any(UserPageQuery.class))).thenReturn(mpPage);
+
+        SysUserRole relation1 = new SysUserRole();
+        relation1.setUserId(2L);
+        relation1.setRoleId(100L);
+        SysUserRole relation2 = new SysUserRole();
+        relation2.setUserId(2L);
+        relation2.setRoleId(100L);
+        SysUserRole relation3 = new SysUserRole();
+        relation3.setUserId(2L);
+        relation3.setRoleId(200L);
+        when(userRoleMapper.selectList(any())).thenReturn(List.of(relation1, relation2, relation3));
+
+        SysRole roleA = new SysRole();
+        roleA.setId(100L);
+        roleA.setName("管理员");
+        SysRole roleB = new SysRole();
+        roleB.setId(200L);
+        roleB.setName("审核员");
+        when(roleMapper.selectBatchIds(anyCollection())).thenReturn(List.of(roleA, roleB));
+
+        Page<UserVO> result = userService.page(new UserPageQuery(), 1, 10);
+        assertEquals(1, result.getRecords().size());
+        UserVO vo = result.getRecords().get(0);
+        assertNotNull(vo.getRoles());
+        assertEquals(2, vo.getRoles().size());
+        assertEquals(100L, vo.getRoles().get(0).getId());
+        assertEquals("管理员", vo.getRoles().get(0).getName());
+        assertEquals(200L, vo.getRoles().get(1).getId());
+        assertEquals("审核员", vo.getRoles().get(1).getName());
     }
 
     @Test
@@ -320,6 +377,7 @@ class UserServiceImplTest {
         dept.setId(12L);
         dept.setName("财务部");
         when(sysDeptMapper.selectBatchIds(List.of(12L))).thenReturn(List.of(dept));
+        when(userRoleMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         UserVO vo = userService.detail(8L);
         assertEquals("bob", vo.getUsername());
@@ -332,6 +390,7 @@ class UserServiceImplTest {
         assertEquals("财务部", vo.getDept().getName());
         assertEquals(List.of(1L, 2L), vo.getExtraDeptIds());
         assertEquals(Collections.emptyList(), vo.getDataScopeDeptIds());
+        assertEquals(Collections.emptyList(), vo.getRoles());
     }
 
     @Test
@@ -362,6 +421,7 @@ class UserServiceImplTest {
         dept.setId(7L);
         dept.setName("市场部");
         when(sysDeptMapper.selectBatchIds(List.of(7L))).thenReturn(List.of(dept));
+        when(userRoleMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         List<UserVO> result = userService.listByNicknameSuffix(" Nick ");
 
@@ -381,6 +441,7 @@ class UserServiceImplTest {
         assertEquals(List.of(5L, 6L), vo.getExtraDeptIds());
         assertEquals(DataScope.CUSTOM, vo.getDataScope());
         assertEquals(List.of(101L, 102L), vo.getDataScopeDeptIds());
+        assertEquals(Collections.emptyList(), vo.getRoles());
         verify(userMapper).selectByNicknameSuffix("Nick");
     }
 

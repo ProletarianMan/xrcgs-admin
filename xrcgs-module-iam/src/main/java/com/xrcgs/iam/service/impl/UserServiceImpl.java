@@ -6,14 +6,19 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
-import com.xrcgs.iam.entity.SysUser;
-import com.xrcgs.iam.enums.DataScope;
 import com.xrcgs.iam.entity.SysDept;
+import com.xrcgs.iam.entity.SysRole;
+import com.xrcgs.iam.entity.SysUser;
+import com.xrcgs.iam.entity.SysUserRole;
+import com.xrcgs.iam.enums.DataScope;
 import com.xrcgs.iam.mapper.SysDeptMapper;
 import com.xrcgs.iam.mapper.SysUserMapper;
+import com.xrcgs.iam.mapper.SysUserRoleMapper;
+import com.xrcgs.iam.mapper.SysRoleMapper;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
 import com.xrcgs.iam.model.vo.DeptBriefVO;
+import com.xrcgs.iam.model.vo.RoleBriefVO;
 import com.xrcgs.iam.model.vo.UserVO;
 import com.xrcgs.iam.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +27,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,10 +44,12 @@ public class UserServiceImpl implements UserService {
 
     private final SysUserMapper userMapper;
     private final SysDeptMapper deptMapper;
+    private final SysRoleMapper roleMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuthCacheService authCacheService;
     private final DataScopeManager dataScopeManager;
     private final ObjectMapper objectMapper;
+    private final SysUserRoleMapper userRoleMapper;
 
     @Override
     public Page<UserVO> page(UserPageQuery q, long pageNo, long pageSize) {
@@ -54,6 +63,7 @@ public class UserServiceImpl implements UserService {
         }
         List<UserVO> records = entityPage.getRecords().stream().map(this::toVO).collect(Collectors.toList());
         fillDeptInfo(records);
+        fillRoleInfo(records);
         result.setRecords(records);
         return result;
     }
@@ -63,6 +73,7 @@ public class UserServiceImpl implements UserService {
         SysUser user = requireExisting(id);
         UserVO vo = toVO(user);
         fillDeptInfo(Collections.singletonList(vo));
+        fillRoleInfo(Collections.singletonList(vo));
         return vo;
     }
 
@@ -101,6 +112,7 @@ public class UserServiceImpl implements UserService {
         entity.setDataScopeExt(serializeDataScopeExt(dataScope, dto.getDataScopeDeptIds()));
 
         userMapper.insert(entity);
+        saveUserRoles(entity.getId(), dto.getRoleIds());
         return entity.getId();
     }
 
@@ -144,6 +156,8 @@ public class UserServiceImpl implements UserService {
         }
 
         userMapper.updateById(update);
+        userRoleMapper.delete(Wrappers.<SysUserRole>lambdaQuery().eq(SysUserRole::getUserId, id));
+        saveUserRoles(id, dto.getRoleIds());
         evictAuthCache(id);
     }
 
@@ -178,6 +192,7 @@ public class UserServiceImpl implements UserService {
         }
         List<UserVO> vos = users.stream().map(this::toVO).collect(Collectors.toList());
         fillDeptInfo(vos);
+        fillRoleInfo(vos);
         return vos;
     }
 
@@ -231,6 +246,26 @@ public class UserServiceImpl implements UserService {
         return serializeList(deptIds);
     }
 
+    private void saveUserRoles(Long userId, List<Long> roleIds) {
+        if (userId == null || roleIds == null || roleIds.isEmpty()) {
+            return;
+        }
+        List<SysUserRole> relations = roleIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(roleId -> {
+                    SysUserRole relation = new SysUserRole();
+                    relation.setUserId(userId);
+                    relation.setRoleId(roleId);
+                    return relation;
+                })
+                .collect(Collectors.toList());
+        if (relations.isEmpty()) {
+            return;
+        }
+        relations.forEach(userRoleMapper::insert);
+    }
+
     private UserVO toVO(SysUser entity) {
         UserVO vo = new UserVO();
         vo.setId(entity.getId());
@@ -248,9 +283,68 @@ public class UserServiceImpl implements UserService {
         vo.setExtraDeptIds(parseList(entity.getExtraDeptIds()));
         vo.setDataScope(entity.getDataScope());
         vo.setDataScopeDeptIds(parseList(entity.getDataScopeExt()));
+        vo.setRoles(Collections.emptyList());
         vo.setCreatedAt(entity.getCreatedAt());
         vo.setUpdatedAt(entity.getUpdatedAt());
         return vo;
+    }
+
+    private void fillRoleInfo(List<UserVO> users) {
+        if (users == null || users.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = users.stream()
+                .map(UserVO::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (userIds.isEmpty()) {
+            return;
+        }
+        List<SysUserRole> relations = userRoleMapper.selectList(Wrappers.<SysUserRole>lambdaQuery()
+                .in(SysUserRole::getUserId, userIds));
+        if (relations == null || relations.isEmpty()) {
+            return;
+        }
+        Map<Long, List<Long>> userRoleIdMap = new HashMap<>();
+        List<Long> roleIds = new ArrayList<>();
+        for (SysUserRole relation : relations) {
+            if (relation.getUserId() == null || relation.getRoleId() == null) {
+                continue;
+            }
+            userRoleIdMap.computeIfAbsent(relation.getUserId(), k -> new ArrayList<>())
+                    .add(relation.getRoleId());
+            roleIds.add(relation.getRoleId());
+        }
+        if (roleIds.isEmpty()) {
+            return;
+        }
+        List<SysRole> roles = roleMapper.selectBatchIds(roleIds.stream().distinct().collect(Collectors.toList()));
+        if (roles == null || roles.isEmpty()) {
+            return;
+        }
+        Map<Long, SysRole> roleMap = roles.stream()
+                .filter(role -> role.getId() != null)
+                .collect(Collectors.toMap(SysRole::getId, role -> role, (a, b) -> a));
+        users.forEach(user -> {
+            List<Long> mappedRoleIds = userRoleIdMap.get(user.getId());
+            if (mappedRoleIds == null || mappedRoleIds.isEmpty()) {
+                user.setRoles(Collections.emptyList());
+                return;
+            }
+            List<RoleBriefVO> roleVos = mappedRoleIds.stream()
+                    .distinct()
+                    .map(roleMap::get)
+                    .filter(Objects::nonNull)
+                    .map(role -> {
+                        RoleBriefVO roleVo = new RoleBriefVO();
+                        roleVo.setId(role.getId());
+                        roleVo.setName(role.getName());
+                        return roleVo;
+                    })
+                    .collect(Collectors.toList());
+            user.setRoles(roleVos);
+        });
     }
 
     private void fillDeptInfo(List<UserVO> users) {
