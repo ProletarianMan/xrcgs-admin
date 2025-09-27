@@ -1,6 +1,8 @@
 package com.xrcgs.iam.model.dto;
 
 import com.xrcgs.iam.enums.DataScope;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -37,6 +39,10 @@ public class UserUpsertDTO {
 
     @Size(max = 32, message = "手机号长度不能超过32个字符")
     private String phone;
+
+    @Min(value = 0, message = "性别取值只能为0或1")
+    @Max(value = 1, message = "性别取值只能为0或1")
+    private Integer gender;
 
     private Boolean enabled;
 

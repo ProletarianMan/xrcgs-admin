@@ -23,6 +23,8 @@ public class SysUser {
     private String wechatId;
     @TableField("phone")
     private String phone;
+    @TableField("gender")
+    private Integer gender;
     private Boolean enabled;
 
     private Long deptId;
