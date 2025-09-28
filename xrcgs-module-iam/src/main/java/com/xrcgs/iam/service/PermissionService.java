@@ -15,5 +15,5 @@ public interface PermissionService {
 
     void update(Long id, PermissionUpsertDTO dto);
 
-    void remove(Long id);
+    void remove(List<Long> ids);
 }

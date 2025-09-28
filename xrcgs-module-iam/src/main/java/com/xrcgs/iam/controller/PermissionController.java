@@ -6,6 +6,7 @@ import com.xrcgs.iam.model.vo.PermissionVO;
 import com.xrcgs.iam.service.PermissionService;
 import com.xrcgs.syslog.annotation.OpLog;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -51,11 +52,11 @@ public class PermissionController {
         return R.ok(true);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping
     @OpLog("删除独立权限")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:permission:delete')")
-    public R<Boolean> delete(@PathVariable @NotNull Long id) {
-        permissionService.remove(id);
+    public R<Boolean> delete(@RequestBody @NotEmpty List<@NotNull Long> ids) {
+        permissionService.remove(ids);
         return R.ok(true);
     }
 }

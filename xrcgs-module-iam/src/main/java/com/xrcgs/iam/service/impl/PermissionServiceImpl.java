@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -98,11 +99,26 @@ public class PermissionServiceImpl implements PermissionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void remove(Long id) {
-        require(id);
-        permissionMapper.deleteById(id);
+    public void remove(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        List<Long> targetIds = ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (targetIds.isEmpty()) {
+            return;
+        }
+
+        List<SysPermission> existing = permissionMapper.selectBatchIds(targetIds);
+        if (existing == null || existing.size() != targetIds.size()) {
+            throw new IllegalArgumentException("部分权限不存在或已删除");
+        }
+
+        permissionMapper.deleteBatchIds(targetIds);
         rolePermMapper.delete(
-                Wrappers.<SysRolePerm>lambdaQuery().eq(SysRolePerm::getPermId, id)
+                Wrappers.<SysRolePerm>lambdaQuery().in(SysRolePerm::getPermId, targetIds)
         );
     }
 
