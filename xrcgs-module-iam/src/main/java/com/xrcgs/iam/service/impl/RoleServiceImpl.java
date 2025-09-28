@@ -3,6 +3,7 @@ package com.xrcgs.iam.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.entity.*;
 import com.xrcgs.iam.mapper.*;
@@ -10,13 +11,21 @@ import com.xrcgs.iam.model.dto.RoleGrantMenuDTO;
 import com.xrcgs.iam.model.dto.RoleGrantPermDTO;
 import com.xrcgs.iam.model.dto.RoleUpsertDTO;
 import com.xrcgs.iam.model.query.RolePageQuery;
+import com.xrcgs.iam.model.vo.DeptBriefVO;
+import com.xrcgs.iam.model.vo.RolePageVO;
 import com.xrcgs.iam.service.RoleService;
-import com.xrcgs.common.cache.AuthCacheService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +35,7 @@ public class RoleServiceImpl implements RoleService {
     private final SysRoleMenuMapper roleMenuMapper;
     private final SysRolePermMapper rolePermMapper;
     private final SysUserRoleMapper userRoleMapper;
+    private final SysDeptMapper deptMapper;
     private final AuthCacheService authCacheService;
     private final DataScopeManager dataScopeManager;
 
@@ -42,23 +52,50 @@ public class RoleServiceImpl implements RoleService {
             throw new IllegalArgumentException("角色编码已存在: " + dto.getCode());
         }
 
+        SysRole origin = null;
+        if (dto.getId() != null) {
+            origin = roleMapper.selectById(dto.getId());
+            if (origin == null) {
+                throw new IllegalArgumentException("角色不存在: " + dto.getId());
+            }
+        }
+
         SysRole role = new SysRole();
         role.setId(dto.getId());
         role.setCode(dto.getCode());
         role.setName(dto.getName());
-        role.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
-        role.setSortNo(dto.getSortNo() == null ? 0 : dto.getSortNo());
-        role.setDataScope(dto.getDataScope());
+        Integer status = dto.getStatus();
+        if (status == null) {
+            status = origin != null ? origin.getStatus() : 1;
+        }
+        role.setStatus(status);
+        role.setDeptId(dto.getDeptId() == null && origin != null ? origin.getDeptId() : dto.getDeptId());
+
+        Integer sortNo = dto.getSortNo();
+        if (sortNo == null) {
+            if (dto.getId() == null) {
+                Integer maxSortNo = roleMapper.selectMaxSortNo();
+                sortNo = (maxSortNo == null ? 1 : maxSortNo + 1);
+            } else {
+                sortNo = origin.getSortNo();
+            }
+        }
+        role.setSortNo(sortNo);
+        role.setDataScope(dto.getDataScope() == null && origin != null ? origin.getDataScope() : dto.getDataScope());
         try {
-            if (dto.getDataScope() != null && "CUSTOM".equals(dto.getDataScope().name())) {
-                role.setDataScopeExt(objectMapper.writeValueAsString(dto.getDataScopeDeptIds()));
+            if (role.getDataScope() != null && "CUSTOM".equals(role.getDataScope().name())) {
+                if (dto.getDataScopeDeptIds() == null && origin != null && origin.getDataScope() == role.getDataScope()) {
+                    role.setDataScopeExt(origin.getDataScopeExt());
+                } else {
+                    role.setDataScopeExt(objectMapper.writeValueAsString(dto.getDataScopeDeptIds()));
+                }
             } else {
                 role.setDataScopeExt(null);
             }
         } catch (Exception e) {
             throw new RuntimeException("dataScopeExt 序列化失败", e);
         }
-        role.setRemark(dto.getRemark());
+        role.setRemark(dto.getRemark() == null && origin != null ? origin.getRemark() : dto.getRemark());
 
         if (role.getId() == null) roleMapper.insert(role);
         else roleMapper.updateById(role);
@@ -113,8 +150,55 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
-    public Page<SysRole> page(RolePageQuery q, long pageNo, long pageSize) {
-        return roleMapper.selectPage(new Page<>(pageNo, pageSize), q);
+    public Page<RolePageVO> page(RolePageQuery q, long pageNo, long pageSize) {
+        Page<SysRole> rawPage = roleMapper.selectPage(new Page<>(pageNo, pageSize), q);
+        List<SysRole> records = rawPage.getRecords();
+        if (records == null || records.isEmpty()) {
+            Page<RolePageVO> empty = new Page<>(rawPage.getCurrent(), rawPage.getSize(), rawPage.getTotal());
+            empty.setRecords(Collections.emptyList());
+            empty.setPages(rawPage.getPages());
+            return empty;
+        }
+
+        Set<Long> deptIds = new HashSet<>();
+        for (SysRole role : records) {
+            if (role.getDeptId() != null) {
+                deptIds.add(role.getDeptId());
+            }
+        }
+
+        Map<Long, SysDept> deptMap = Collections.emptyMap();
+        if (!deptIds.isEmpty()) {
+            List<SysDept> depts = deptMapper.selectBatchIds(deptIds);
+            if (depts != null && !depts.isEmpty()) {
+                deptMap = new HashMap<>(depts.size());
+                for (SysDept dept : depts) {
+                    deptMap.put(dept.getId(), dept);
+                }
+            }
+        }
+
+        List<RolePageVO> vos = new ArrayList<>(records.size());
+        for (SysRole role : records) {
+            RolePageVO vo = new RolePageVO();
+            BeanUtils.copyProperties(role, vo);
+            Long deptId = role.getDeptId();
+            if (deptId != null) {
+                SysDept dept = deptMap.get(deptId);
+                if (dept != null) {
+                    DeptBriefVO deptBriefVO = new DeptBriefVO();
+                    deptBriefVO.setId(dept.getId());
+                    deptBriefVO.setName(dept.getName());
+                    vo.setDept(deptBriefVO);
+                }
+            }
+            vos.add(vo);
+        }
+
+        Page<RolePageVO> result = new Page<>(rawPage.getCurrent(), rawPage.getSize(), rawPage.getTotal());
+        result.setPages(rawPage.getPages());
+        result.setRecords(vos);
+        return result;
     }
 
     @Override

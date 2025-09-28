@@ -14,6 +14,7 @@ public class RoleUpsertDTO {
     private String code;
     private String name;
     private Integer status;
+    private Long deptId;
     private Integer sortNo;
     private DataScope dataScope; // ALL/DEPT/DEPT_AND_CHILD/SELF/CUSTOM
     private List<Long> dataScopeDeptIds; // CUSTOM 时有效
