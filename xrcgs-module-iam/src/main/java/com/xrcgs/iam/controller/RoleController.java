@@ -1,11 +1,11 @@
 package com.xrcgs.iam.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.xrcgs.iam.entity.SysRole;
 import com.xrcgs.iam.model.dto.RoleGrantMenuDTO;
 import com.xrcgs.iam.model.dto.RoleGrantPermDTO;
 import com.xrcgs.iam.model.dto.RoleUpsertDTO;
 import com.xrcgs.iam.model.query.RolePageQuery;
+import com.xrcgs.iam.model.vo.RolePageVO;
 import com.xrcgs.iam.service.RoleService;
 // ↓↓↓ 按你项目实际包名修改（任选其一/或替换为真实路径）
 import com.xrcgs.common.core.R; // 如果你的 R 在这里
@@ -34,10 +34,10 @@ public class RoleController {
     // 分页查询
     @GetMapping("/page")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:list')")
-    public R<Page<SysRole>> page(@Valid RolePageQuery q,
-                                 @RequestParam(defaultValue = "1") long pageNo,
-                                 @RequestParam(defaultValue = "10") long pageSize) {
-        Page<SysRole> page = roleService.page(q, pageNo, pageSize);
+    public R<Page<RolePageVO>> page(@Valid RolePageQuery q,
+                                    @RequestParam(defaultValue = "1") long pageNo,
+                                    @RequestParam(defaultValue = "10") long pageSize) {
+        Page<RolePageVO> page = roleService.page(q, pageNo, pageSize);
         return R.ok(page);
     }
 
