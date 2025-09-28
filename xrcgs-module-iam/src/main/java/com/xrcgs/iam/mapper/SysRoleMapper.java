@@ -11,4 +11,6 @@ import java.util.List;
 public interface SysRoleMapper extends BaseMapper<SysRole> {
     Page<SysRole> selectPage(Page<SysRole> page, @Param("q") RolePageQuery q);
     List<Long> selectIdsByCodes(@Param("codes") List<String> codes);
+
+    Integer selectMaxSortNo();
 }
