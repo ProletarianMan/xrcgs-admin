@@ -5,7 +5,7 @@
 
     <select id="selectPage" resultType="com.xrcgs.iam.entity.SysRole">
         SELECT
-        id, code, name, status, data_scope AS dataScope, data_scope_ext AS dataScopeExt,
+        id, code, name, status, dept_id AS deptId, data_scope AS dataScope, data_scope_ext AS dataScopeExt,
         remark, sort_no AS sortNo, create_by AS createBy, create_time AS createTime,
         update_by AS updateBy, update_time AS updateTime, del_flag AS delFlag
         FROM sys_role
@@ -35,6 +35,10 @@
             #{code}
         </foreach>
           AND del_flag = 0
+    </select>
+
+    <select id="selectMaxSortNo" resultType="java.lang.Integer">
+        SELECT MAX(sort_no) FROM sys_role WHERE del_flag = 0
     </select>
 
 </mapper>
