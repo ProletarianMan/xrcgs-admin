@@ -10,6 +10,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +35,14 @@ public class PermissionController {
     @GetMapping("/list")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:grantPerm')")
     public R<List<PermissionVO>> list(@RequestParam(value = "name", required = false) String name) {
-        return R.ok(permissionService.list(name));
+        String keyword = null;
+        if (StringUtils.hasText(name)) {
+            String normalized = name.trim();
+            if (StringUtils.hasText(normalized)) {
+                keyword = normalized.endsWith("*") ? normalized : normalized + "*";
+            }
+        }
+        return R.ok(permissionService.list(keyword));
     }
 
     @PostMapping
