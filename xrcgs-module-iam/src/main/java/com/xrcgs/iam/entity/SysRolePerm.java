@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 @TableName("sys_role_perm")
 public class SysRolePerm {
-    @TableId(type = IdType.ASSIGN_UUID)
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private Long roleId;
