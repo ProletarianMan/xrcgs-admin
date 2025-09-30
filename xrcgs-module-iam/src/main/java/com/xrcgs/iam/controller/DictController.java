@@ -19,6 +19,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 字典控制器
  * 类型：iam:dict:type:list|create|update|delete
@@ -34,6 +36,16 @@ public class DictController {
     private final DictService dictService;
 
     /* ---------- 字典类型 ---------- */
+
+    /**
+     * 字典类型清单：支持 code/name 关键字模糊、状态与创建时间区间过滤。
+     * 若前端希望分页，可在查询层自行封装；此接口返回完整列表。
+     */
+    @GetMapping("/type")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:type:list')")
+    public R<List<SysDictType>> listTypes(@Valid DictTypePageQuery q) {
+        return R.ok(dictService.listTypes(q));
+    }
 
     /** 字典项分页：按 typeCode + label 模糊 */
     @GetMapping("/item/page")

@@ -1,5 +1,6 @@
 package com.xrcgs.iam.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,12 +9,14 @@ import com.xrcgs.iam.entity.SysDictType;
 import com.xrcgs.iam.mapper.SysDictItemMapper;
 import com.xrcgs.iam.mapper.SysDictTypeMapper;
 import com.xrcgs.iam.model.query.DictItemPageQuery;
+import com.xrcgs.iam.model.query.DictTypePageQuery;
 import com.xrcgs.iam.model.vo.DictVO;
 import com.xrcgs.iam.service.DictService;
 import com.xrcgs.common.cache.AuthCacheService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.Comparator;
 import java.util.List;
@@ -127,5 +130,29 @@ public class DictServiceImpl implements DictService {
     public Page<SysDictItem> pageItems(DictItemPageQuery q, long pageNo, long pageSize) {
         Page<SysDictItem> page = new Page<>(pageNo, pageSize);
         return itemMapper.selectPageByQuery(page, q);
+    }
+
+    @Override
+    public List<SysDictType> listTypes(DictTypePageQuery q) {
+        LambdaQueryWrapper<SysDictType> wrapper = Wrappers.lambdaQuery();
+        if (q != null) {
+            String keyword = StringUtils.hasText(q.getKeyword()) ? q.getKeyword().trim() : null;
+            if (StringUtils.hasText(keyword)) {
+                wrapper.and(w -> w.like(SysDictType::getCode, keyword)
+                        .or()
+                        .like(SysDictType::getName, keyword));
+            }
+            if (q.getStatus() != null) {
+                wrapper.eq(SysDictType::getStatus, q.getStatus());
+            }
+            if (q.getStartTime() != null) {
+                wrapper.ge(SysDictType::getCreateTime, q.getStartTime());
+            }
+            if (q.getEndTime() != null) {
+                wrapper.le(SysDictType::getCreateTime, q.getEndTime());
+            }
+        }
+        wrapper.orderByAsc(SysDictType::getId);
+        return typeMapper.selectList(wrapper);
     }
 }
