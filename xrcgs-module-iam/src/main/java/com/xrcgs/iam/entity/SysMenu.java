@@ -1,6 +1,7 @@
 package com.xrcgs.iam.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.xrcgs.iam.enums.MenuType;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -34,9 +35,11 @@ public class SysMenu {
     private Integer visible; // 1显示 0隐藏
     private Integer status;  // 1启用 0禁用
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    @JsonFormat(pattern = "yyyy-MM-dd")
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
