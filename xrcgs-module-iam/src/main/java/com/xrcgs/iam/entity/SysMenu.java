@@ -26,13 +26,14 @@ public class SysMenu {
 
     private String perms;   // 例：iam:user:list
     private String icon;
-    @TableField("rank")
+    @TableField("`rank`")
     private Integer rank;
     @TableField("keep_alive")
     private Boolean keepAlive;    // 是否开启组件缓存
     @TableField("show_parent")
     private Boolean showParent;   // 面包屑中是否显示父级
     private Integer visible; // 1显示 0隐藏
+    @TableField("`status`")
     private Integer status;  // 1启用 0禁用
 
     @JsonFormat(pattern = "yyyy-MM-dd")
