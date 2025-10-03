@@ -1,6 +1,7 @@
 package com.xrcgs.iam.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -20,9 +21,11 @@ public class SysDictItem {
     private String ext;
     private Integer status; // 1启用 0禁用
 
+    @JsonFormat(pattern = "yyy-MM-dd")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
+    @JsonFormat(pattern = "yyy-MM-dd")
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 }
