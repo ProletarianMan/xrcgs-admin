@@ -1,5 +1,5 @@
 CREATE TABLE `sys_op_log` (
-  `id` varchar(255) NOT NULL,
+  `id` bigint NOT NULL,
   `title` varchar(255) DEFAULT NULL COMMENT '操作标题',
   `username` varchar(64) DEFAULT NULL COMMENT '用户名',
   `methodSign` varchar(255) DEFAULT NULL COMMENT '方法签名',

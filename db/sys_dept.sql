@@ -1,5 +1,5 @@
 CREATE TABLE `sys_dept` (
-  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键 ID',
+  `id` bigint unsigned NOT NULL COMMENT '主键 ID',
   `parent_id` bigint unsigned NOT NULL DEFAULT '0' COMMENT '父部门 ID，0 表示顶级',
   `path` varchar(512) COLLATE utf8mb4_general_ci NOT NULL COMMENT '物化路径 /1/3/5/，用于层级查询',
   `name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL COMMENT '部门名称',
@@ -21,4 +21,4 @@ CREATE TABLE `sys_dept` (
   KEY `idx_sys_dept_parent_id` (`parent_id`),
   KEY `idx_sys_dept_sort_no` (`parent_id`,`sort_no`),
   CONSTRAINT `chk_sys_dept_path_format` CHECK (regexp_like(`path`,_utf8mb4'^(/[0-9]+)+/$'))
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统部门';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='系统部门';

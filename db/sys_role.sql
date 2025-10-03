@@ -1,5 +1,5 @@
 CREATE TABLE `sys_role` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `id` bigint NOT NULL COMMENT '主键',
   `code` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '例: ADMIN / OPS / USER',
   `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '角色中文名称',
   `dept_id` bigint unsigned DEFAULT NULL COMMENT '归属部门 ID',
@@ -21,4 +21,4 @@ CREATE TABLE `sys_role` (
   KEY `idx_sys_role_dept_id` (`dept_id`),
   CONSTRAINT `chk_role_datascope` CHECK ((`data_scope` in (_utf8mb4'ALL',_utf8mb4'DEPT',_utf8mb4'DEPT_AND_CHILD',_utf8mb4'SELF',_utf8mb4'CUSTOM'))),
   CONSTRAINT `chk_role_status` CHECK ((`status` in (0,1)))
-) ENGINE=InnoDB AUTO_INCREMENT=2002 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色表\r\n';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='角色表\r\n';

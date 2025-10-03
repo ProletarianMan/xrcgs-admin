@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("sys_dict_item")
 public class SysDictItem {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String typeCode; // 外键到 sys_dict_type.code

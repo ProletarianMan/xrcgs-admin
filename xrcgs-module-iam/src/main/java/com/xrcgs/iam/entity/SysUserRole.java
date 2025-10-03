@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 @TableName("sys_user_role")
 public class SysUserRole {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private Long userId;
