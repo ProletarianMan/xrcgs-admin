@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 /**
  * 统一审计字段自动填充：
  * - createdAt/createTime: LocalDateTime，insert 时填
- * - updateTime: LocalDateTime，insert/update 时填
+ * - updatedAt/updateTime: LocalDateTime，insert/update 时填
  * - createdBy: Long（从 Security 获取），insert 时填（拿不到则不填）
  *
  * 说明：
@@ -32,6 +32,7 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
         // 若实体未显式赋值，则自动填充
         strictInsertFill(metaObject, "createdAt", () -> now, LocalDateTime.class);
         strictInsertFill(metaObject, "createTime", () -> now, LocalDateTime.class);
+        strictInsertFill(metaObject, "updatedAt", () -> now, LocalDateTime.class);
         strictInsertFill(metaObject, "updateTime", () -> now, LocalDateTime.class);
 
         Long uid = userIdProvider.getCurrentUserId();
@@ -42,6 +43,7 @@ public class AuditMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void updateFill(MetaObject metaObject) {
+        strictUpdateFill(metaObject, "updatedAt", LocalDateTime::now, LocalDateTime.class);
         strictUpdateFill(metaObject, "updateTime", LocalDateTime::now, LocalDateTime.class);
     }
 }

@@ -146,10 +146,10 @@ public class DictServiceImpl implements DictService {
                 wrapper.eq(SysDictType::getStatus, q.getStatus());
             }
             if (q.getStartTime() != null) {
-                wrapper.ge(SysDictType::getCreateTime, q.getStartTime());
+                wrapper.ge(SysDictType::getCreatedAt, q.getStartTime());
             }
             if (q.getEndTime() != null) {
-                wrapper.le(SysDictType::getCreateTime, q.getEndTime());
+                wrapper.le(SysDictType::getCreatedAt, q.getEndTime());
             }
         }
         wrapper.orderByAsc(SysDictType::getId);

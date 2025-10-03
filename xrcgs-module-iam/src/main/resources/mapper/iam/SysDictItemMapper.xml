@@ -5,7 +5,7 @@
 
     <select id="selectByQuery" resultType="com.xrcgs.iam.entity.SysDictItem">
         SELECT id, type_code AS typeCode, label, value, sort, ext, status,
-        create_time AS createTime, update_time AS updateTime
+        created_at AS createdAt, updated_at AS updatedAt
         FROM sys_dict_item
         WHERE 1 = 1
         <if test="q != null">
@@ -27,10 +27,10 @@
     <!-- 分页：按 typeCode + label 模糊，启用项优先；排序：sort asc, id asc -->
     <select id="selectPageByQuery" resultType="com.xrcgs.iam.entity.SysDictItem">
         SELECT
-        id, type_code, label, value, ext, sort, status,
-        create_by, create_time, update_by, update_time, del_flag
+        id, type_code AS typeCode, label, value, ext, sort, status,
+        created_at AS createdAt, updated_at AS updatedAt
         FROM sys_dict_item
-        WHERE del_flag = 0
+        WHERE 1 = 1
         <if test="q != null and q.typeCode != null and q.typeCode != ''">
             AND type_code = #{q.typeCode}
         </if>
