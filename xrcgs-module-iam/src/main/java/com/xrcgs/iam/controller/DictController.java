@@ -42,14 +42,14 @@ public class DictController {
      * 若前端希望分页，可在查询层自行封装；此接口返回完整列表。
      */
     @GetMapping("/type")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:type:list')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:list')")
     public R<List<SysDictType>> listTypes(@Valid DictTypePageQuery q) {
         return R.ok(dictService.listTypes(q));
     }
 
     /** 字典项分页：按 typeCode + label 模糊 */
     @GetMapping("/item/page")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:item:list')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:list')")
     public com.xrcgs.common.core.R<Page<SysDictItem>> itemPage(
             @Valid DictItemPageQuery q,
             @RequestParam(defaultValue = "1") long pageNo,
@@ -59,7 +59,7 @@ public class DictController {
 
     @PostMapping("/type")
     @OpLog("新增字典类型")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:type:create')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:create')")
     public R<Long> createType(@Valid @RequestBody SysDictType type) {
         Long id = dictService.createType(type);
         return R.ok(id);
@@ -67,7 +67,7 @@ public class DictController {
 
     @PutMapping("/type/{id}")
     @OpLog("修改字典类型")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:type:update')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:update')")
     public R<Boolean> updateType(@PathVariable @NotNull Long id,
                                  @Valid @RequestBody SysDictType type) {
         type.setId(id);
@@ -77,7 +77,7 @@ public class DictController {
 
     @DeleteMapping("/type/{id}")
     @OpLog("删除字典类型")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:type:delete')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:delete')")
     public R<Boolean> removeType(@PathVariable @NotNull Long id) {
         dictService.removeType(id);
         return R.ok(true);
@@ -87,7 +87,7 @@ public class DictController {
 
     @PostMapping("/item")
     @OpLog("新增字典项")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:item:create')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:create')")
     public R<Long> createItem(@Valid @RequestBody SysDictItem item) {
         Long id = dictService.createItem(item);
         return R.ok(id);
@@ -95,7 +95,7 @@ public class DictController {
 
     @PutMapping("/item/{id}")
     @OpLog("修改字典项")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:item:update')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:update')")
     public R<Boolean> updateItem(@PathVariable @NotNull Long id,
                                  @Valid @RequestBody SysDictItem item) {
         item.setId(id);
@@ -105,7 +105,7 @@ public class DictController {
 
     @DeleteMapping("/item/{id}")
     @OpLog("删除字典项")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:item:delete')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:delete')")
     public R<Boolean> removeItem(@PathVariable @NotNull Long id) {
         dictService.removeItem(id);
         return R.ok(true);
