@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 @TableName("sys_op_log")
 public class SysOpLog {
 
-    @TableId(value = "id", type = IdType.ASSIGN_UUID)
-    private String id;
+    @TableId(value = "id", type = IdType.ASSIGN_ID)
+    private Long id;
 
     @TableField("title")
     private String title;

@@ -1,5 +1,5 @@
 CREATE TABLE `sys_user` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
+  `id` bigint NOT NULL,
   `username` varchar(64) NOT NULL,
   `password` varchar(200) NOT NULL,
   `nickname` varchar(64) DEFAULT NULL,
@@ -17,4 +17,4 @@ CREATE TABLE `sys_user` (
   UNIQUE KEY `username` (`username`),
   KEY `idx_sys_user_dept_id` (`dept_id`),
   KEY `nickname` (`nickname`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;

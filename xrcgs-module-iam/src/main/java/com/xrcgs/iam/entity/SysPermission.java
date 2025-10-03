@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Data
 @TableName("sys_permission")
 public class SysPermission {
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     private String code;   // 唯一，如 file:doc:convert

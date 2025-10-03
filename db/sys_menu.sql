@@ -1,5 +1,5 @@
 CREATE TABLE `sys_menu` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
+  `id` bigint NOT NULL,
   `parent_id` bigint DEFAULT '0' COMMENT '父级ID',
   `title` varchar(64) NOT NULL COMMENT '菜单标题',
   `path` varchar(128) DEFAULT NULL COMMENT '前端路由path',
@@ -18,4 +18,4 @@ CREATE TABLE `sys_menu` (
   `del_flag` tinyint DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_menu_perms` (`perms`)
-) ENGINE=InnoDB AUTO_INCREMENT=3010 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='菜单权限表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='菜单权限表';
