@@ -4,7 +4,7 @@
 <mapper namespace="com.xrcgs.iam.mapper.SysDictTypeMapper">
 
     <select id="selectPage" resultType="com.xrcgs.iam.entity.SysDictType">
-        SELECT id, code, name, status, remark, create_time AS createTime, update_time AS updateTime
+        SELECT id, code, name, status, remark, created_at AS createdAt, updated_at AS updatedAt
         FROM sys_dict_type
         WHERE 1 = 1
         <if test="q != null">
@@ -16,10 +16,10 @@
                 AND status = #{q.status}
             </if>
             <if test="q.startTime != null">
-                AND create_time &gt;= #{q.startTime}
+                AND created_at &gt;= #{q.startTime}
             </if>
             <if test="q.endTime != null">
-                AND create_time &lt;= #{q.endTime}
+                AND created_at &lt;= #{q.endTime}
             </if>
         </if>
         ORDER BY id DESC

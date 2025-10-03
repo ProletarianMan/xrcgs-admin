@@ -18,9 +18,9 @@ public class SysDictType {
     private Integer status; // 1启用 0禁用
     private String remark;
 
-    @TableField(fill = FieldFill.INSERT)
-    private LocalDateTime createTime;
+    @TableField(value = "created_at", fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
 
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updateTime;
+    @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }
