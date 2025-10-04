@@ -1,5 +1,6 @@
 package com.xrcgs.syslog.aop;
 
+import com.xrcgs.common.security.UserPrincipal;
 import com.xrcgs.syslog.annotation.OpLog;
 import com.xrcgs.syslog.config.OpLogProperties;
 import com.xrcgs.syslog.entity.SysOpLog;
@@ -141,12 +142,18 @@ public class OpLogAspect {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth == null) return "anonymous";
-            Object p = auth.getPrincipal();
-            if (p == null) return "anonymous";
-            // UserDetails 或 String
-            return (p instanceof org.springframework.security.core.userdetails.UserDetails ud)
-                    ? ud.getUsername()
-                    : p.toString();
+            Object principal = auth.getPrincipal();
+            if (principal == null) return "anonymous";
+            if (principal instanceof UserPrincipal userPrincipal) {
+                return userPrincipal.getUsername();
+            }
+            if (principal instanceof org.springframework.security.core.userdetails.UserDetails ud) {
+                return ud.getUsername();
+            }
+            if (principal instanceof CharSequence seq) {
+                return seq.toString();
+            }
+            return principal.toString();
         } catch (Exception e) {
             return "anonymous";
         }
