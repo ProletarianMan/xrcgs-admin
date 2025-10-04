@@ -48,7 +48,7 @@ public class SysOpLogController {
      * 查询操作日志详情
      */
     @GetMapping("/{id}")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'sys:op-log:get')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'sys:op-log:list')")
     public R<SysOpLog> get(@PathVariable @NotNull Long id) {
         return R.ok(sysOpLogService.get(id));
     }

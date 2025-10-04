@@ -1,6 +1,7 @@
 package com.xrcgs.syslog.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -55,6 +56,7 @@ public class SysOpLog {
     @TableField("exceptionMsg")
     private String exceptionMsg;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     @TableField(value = "createdAt", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }
