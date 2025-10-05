@@ -539,8 +539,14 @@ public class InspectionRecordExcelExporter {
         findCellByLabel(sheet, label).ifPresent(labelCell -> {
             Cell target = locateTargetCell(sheet, labelCell);
             if (target == null) {
-                log.debug("未找到标签 [{}] 对应的录入单元格，保持模板原样", label);
-                return;
+                Row row = sheet.getRow(labelCell.getRowIndex());
+                if (row != null) {
+                    target = row.getCell(labelCell.getColumnIndex() + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                }
+                if (target == null) {
+                    log.debug("未找到标签 [{}] 对应的录入单元格，保持模板原样", label);
+                    return;
+                }
             }
             target.setCellValue(Optional.ofNullable(value).orElse(""));
         });
@@ -563,9 +569,9 @@ public class InspectionRecordExcelExporter {
             lastCellNum = (short) (labelColumn + 2);
         }
         for (int column = labelColumn + 1; column <= lastCellNum; column++) {
-            Cell candidate = row.getCell(column);
+            Cell candidate = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
             if (candidate == null) {
-                continue;
+                candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             }
             if (candidate.getCellType() == CellType.STRING) {
                 String text = candidate.getStringCellValue();

@@ -87,10 +87,16 @@ class InspectionRecordExcelExporterTest {
                 .exportFileName("record.xlsx")
                 .build();
 
-        Path exportDir = Files.createDirectories(tempDir.resolve("export"));
+        Path exportDir = Paths.get("src/test/resources/export");
+        Files.createDirectories(exportDir);
+        Path expectedOutput = exportDir.resolve("record.xlsx");
+        Files.deleteIfExists(expectedOutput);
+
         Path output = exporter.export(record, exportDir);
         log.info("巡查记录导出文件路径: {}", output.toAbsolutePath());
+        assertThat(output).isEqualTo(expectedOutput);
         assertThat(Files.exists(output)).isTrue();
+        assertThat(output.getFileName().toString()).isEqualTo("record.xlsx");
 
         try (InputStream inputStream = Files.newInputStream(output);
              XSSFWorkbook workbook = new XSSFWorkbook(inputStream)) {
