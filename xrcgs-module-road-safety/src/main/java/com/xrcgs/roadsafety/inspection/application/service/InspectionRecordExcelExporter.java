@@ -31,6 +31,7 @@ import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.ss.usermodel.CellCopyPolicy;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
@@ -275,13 +276,66 @@ public class InspectionRecordExcelExporter {
 
     private void setCellToRightOfLabel(Sheet sheet, String label, String value) {
         findCellByLabel(sheet, label).ifPresent(labelCell -> {
-            Row row = sheet.getRow(labelCell.getRowIndex());
-            if (row == null) {
+            Cell target = locateTargetCell(sheet, labelCell);
+            if (target == null) {
+                log.debug("未找到标签 [{}] 对应的录入单元格，保持模板原样", label);
                 return;
             }
-            Cell target = row.getCell(labelCell.getColumnIndex() + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             target.setCellValue(Optional.ofNullable(value).orElse(""));
         });
+    }
+
+    private Cell locateTargetCell(Sheet sheet, Cell labelCell) {
+        Row row = sheet.getRow(labelCell.getRowIndex());
+        if (row == null) {
+            return null;
+        }
+
+        Cell mergedTarget = findMergedTarget(sheet, labelCell, row);
+        if (mergedTarget != null) {
+            return mergedTarget;
+        }
+
+        int labelColumn = labelCell.getColumnIndex();
+        short lastCellNum = row.getLastCellNum();
+        if (lastCellNum < 0) {
+            lastCellNum = (short) (labelColumn + 2);
+        }
+        for (int column = labelColumn + 1; column <= lastCellNum; column++) {
+            Cell candidate = row.getCell(column);
+            if (candidate == null) {
+                continue;
+            }
+            if (candidate.getCellType() == CellType.STRING) {
+                String text = candidate.getStringCellValue();
+                if (text != null && text.contains("：")) {
+                    continue;
+                }
+                if (text == null || text.isBlank()) {
+                    return candidate;
+                }
+            } else {
+                return candidate;
+            }
+        }
+        return row.getCell(labelColumn + 1);
+    }
+
+    private Cell findMergedTarget(Sheet sheet, Cell labelCell, Row row) {
+        int labelColumn = labelCell.getColumnIndex();
+        int rowIndex = labelCell.getRowIndex();
+        CellRangeAddress nearest = null;
+        for (CellRangeAddress region : sheet.getMergedRegions()) {
+            if (region.getFirstRow() == rowIndex && region.getLastRow() == rowIndex && region.getFirstColumn() > labelColumn) {
+                if (nearest == null || region.getFirstColumn() < nearest.getFirstColumn()) {
+                    nearest = region;
+                }
+            }
+        }
+        if (nearest == null) {
+            return null;
+        }
+        return row.getCell(nearest.getFirstColumn());
     }
 
     private Optional<Cell> findCellByLabel(Sheet sheet, String label) {

@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.nio.file.Paths;
+import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
@@ -25,6 +26,7 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.FileSystemResource;
@@ -94,6 +96,14 @@ class InspectionRecordExcelExporterTest {
             String dateText = readValueRightOfLabel(sheet, "巡查时间");
             assertThat(dateText).contains("2024年12月01日");
 
+            Row dateRow = sheet.getRow(2);
+            assertThat(dateRow.getCell(1).getStringCellValue()).isEqualTo("：");
+            Cell targetCell = findTargetCell(sheet, "巡查时间");
+            assertThat(targetCell).isNotNull();
+            assertThat(targetCell.getColumnIndex()).isEqualTo(2);
+            assertThat(targetCell.getStringCellValue()).contains("2024年12月01日");
+            assertThat(targetCell.getCellStyle().getBorderBottom()).isEqualTo(BorderStyle.THIN);
+
             String handlingText = readValueRightOfLabel(sheet, "巡查、处理情况");
             assertThat(handlingText)
                     .contains("一、道路病害或损坏情况")
@@ -142,13 +152,20 @@ class InspectionRecordExcelExporterTest {
             for (int i = 0; i <= 150; i++) {
                 sheet.createRow(i);
             }
-            sheet.getRow(2).createCell(0).setCellValue("巡查时间");
-            sheet.getRow(3).createCell(0).setCellValue("天气情况");
-            sheet.getRow(4).createCell(0).setCellValue("巡查人员");
-            sheet.getRow(5).createCell(0).setCellValue("巡查里程");
-            sheet.getRow(6).createCell(0).setCellValue("巡查路段");
+
+            createLabeledRow(sheet, 2, "巡查时间");
+            createLabeledRow(sheet, 3, "天气情况");
+            createLabeledRow(sheet, 4, "巡查人员");
+            createLabeledRow(sheet, 5, "巡查里程");
+            createLabeledRow(sheet, 6, "巡查路段");
+
             sheet.getRow(7).createCell(0).setCellValue("巡查、处理情况");
+            addColonCell(sheet, 7, 1);
+            createMergedInputCell(sheet, 7, 2, 9, BorderStyle.THIN);
+
             sheet.getRow(11).createCell(0).setCellValue("备注");
+            addColonCell(sheet, 11, 1);
+            createMergedInputCell(sheet, 11, 2, 5, BorderStyle.THIN);
 
             try (OutputStream outputStream = Files.newOutputStream(path)) {
                 workbook.write(outputStream);
@@ -157,15 +174,92 @@ class InspectionRecordExcelExporterTest {
         return path;
     }
 
+    private void createLabeledRow(Sheet sheet, int rowIndex, String label) {
+        sheet.getRow(rowIndex).createCell(0).setCellValue(label);
+        addColonCell(sheet, rowIndex, 1);
+        createMergedInputCell(sheet, rowIndex, 2, 4, BorderStyle.THIN);
+    }
+
+    private void addColonCell(Sheet sheet, int rowIndex, int columnIndex) {
+        sheet.getRow(rowIndex).createCell(columnIndex).setCellValue("：");
+    }
+
+    private void createMergedInputCell(Sheet sheet, int rowIndex, int startColumn, int columnSpan, BorderStyle border) {
+        Row row = sheet.getRow(rowIndex);
+        for (int i = 0; i < columnSpan; i++) {
+            row.createCell(startColumn + i);
+        }
+        sheet.addMergedRegion(new CellRangeAddress(rowIndex, rowIndex, startColumn, startColumn + columnSpan - 1));
+        var workbook = sheet.getWorkbook();
+        var style = workbook.createCellStyle();
+        style.setBorderBottom(border);
+        style.setBorderTop(border);
+        style.setBorderLeft(border);
+        style.setBorderRight(border);
+        style.setWrapText(true);
+        row.getCell(startColumn).setCellStyle(style);
+    }
+
     private String readValueRightOfLabel(Sheet sheet, String label) {
-        for (Row row : sheet) {
-            for (Cell cell : row) {
-                if (cell.getCellType() == CellType.STRING && cell.getStringCellValue().contains(label)) {
-                    return row.getCell(cell.getColumnIndex() + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK)
-                            .getStringCellValue();
+        Cell targetCell = findTargetCell(sheet, label);
+        if (targetCell == null) {
+            throw new IllegalStateException("未找到标签: " + label);
+        }
+        return targetCell.getStringCellValue();
+    }
+
+    private Cell findTargetCell(Sheet sheet, String label) {
+        Cell labelCell = findLabelCell(sheet, label);
+        if (labelCell == null) {
+            return null;
+        }
+        Row row = sheet.getRow(labelCell.getRowIndex());
+        int labelColumn = labelCell.getColumnIndex();
+        CellRangeAddress nearest = null;
+        for (CellRangeAddress region : sheet.getMergedRegions()) {
+            if (region.getFirstRow() == labelCell.getRowIndex()
+                    && region.getLastRow() == labelCell.getRowIndex()
+                    && region.getFirstColumn() > labelColumn) {
+                if (nearest == null || region.getFirstColumn() < nearest.getFirstColumn()) {
+                    nearest = region;
                 }
             }
         }
-        throw new IllegalStateException("未找到标签: " + label);
+        if (nearest != null) {
+            return row.getCell(nearest.getFirstColumn());
+        }
+        short lastCellNum = row.getLastCellNum();
+        if (lastCellNum < 0) {
+            lastCellNum = (short) (labelColumn + 2);
+        }
+        for (int column = labelColumn + 1; column <= lastCellNum; column++) {
+            Cell candidate = row.getCell(column);
+            if (candidate == null) {
+                continue;
+            }
+            if (candidate.getCellType() == CellType.STRING) {
+                String text = candidate.getStringCellValue();
+                if (text != null && text.contains("：")) {
+                    continue;
+                }
+                if (text == null || text.isBlank()) {
+                    return candidate;
+                }
+            } else {
+                return candidate;
+            }
+        }
+        return row.getCell(labelColumn + 1);
+    }
+
+    private Cell findLabelCell(Sheet sheet, String label) {
+        for (Row row : sheet) {
+            for (Cell cell : row) {
+                if (cell != null && cell.getCellType() == CellType.STRING && cell.getStringCellValue().contains(label)) {
+                    return cell;
+                }
+            }
+        }
+        return null;
     }
 }
