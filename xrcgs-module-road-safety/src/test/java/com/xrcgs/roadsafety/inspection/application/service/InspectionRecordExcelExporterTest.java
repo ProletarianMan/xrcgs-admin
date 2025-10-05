@@ -130,7 +130,7 @@ class InspectionRecordExcelExporterTest {
                     Cell keyCell = row.getCell(0);
                     if (keyCell != null && "createdBy".equals(keyCell.getStringCellValue())) {
                         XSSFRow valueRow = (XSSFRow) infoSheet.getRow(row.getRowNum() + 1);
-                        assertThat(valueRow).isNotNull();
+                        assertThat((Object) valueRow).isNotNull();
                         assertThat(valueRow.getCell(0).getStringCellValue()).isEqualTo("张三");
                         assertThat(valueRow.getCell(1).getStringCellValue()).contains("2024年12月01日 09:30");
                         assertThat(valueRow.getCell(4).getStringCellValue()).contains("2024年12月01日 18:30");
