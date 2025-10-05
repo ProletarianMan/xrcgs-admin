@@ -12,23 +12,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.nio.file.Paths;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.FileSystemResource;
@@ -94,8 +93,8 @@ class InspectionRecordExcelExporterTest {
         assertThat(Files.exists(output)).isTrue();
 
         try (InputStream inputStream = Files.newInputStream(output);
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
-            XSSFSheet infoSheet = (XSSFSheet) workbook.getSheetAt(0);
+             XSSFWorkbook workbook = new XSSFWorkbook(inputStream)) {
+            XSSFSheet infoSheet = workbook.getSheetAt(0);
 
             assertThat(infoSheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("巡查记录表");
             assertThat(infoSheet.getRow(1).getCell(0).getStringCellValue())
