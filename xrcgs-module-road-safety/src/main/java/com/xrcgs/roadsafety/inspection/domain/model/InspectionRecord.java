@@ -27,6 +27,11 @@ public class InspectionRecord {
     private LocalDate date;
 
     /**
+     * 单位名称，用于表头展示。
+     */
+    private String unitName;
+
+    /**
      * 天气情况。
      */
     private String weather;
