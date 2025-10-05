@@ -31,10 +31,12 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.Units;
-import org.apache.poi.ss.util.SheetUtil;
-import org.apache.poi.xssf.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
@@ -425,7 +427,14 @@ public class InspectionRecordExcelExporter {
     }
 
     private long columnWidthInEmu(Sheet sheet, int columnIndex) {
-        double pixels = SheetUtil.getColumnWidthInPixels(sheet, columnIndex);
+        if (sheet.isColumnHidden(columnIndex)) {
+            return EMU_PER_PIXEL;
+        }
+        double pixels = sheet.getColumnWidth(columnIndex) / 256.0 * Units.DEFAULT_CHARACTER_WIDTH;
+        if (Double.isNaN(pixels) || pixels <= 0) {
+            double fallbackCharacters = sheet.getDefaultColumnWidth();
+            pixels = fallbackCharacters * Units.DEFAULT_CHARACTER_WIDTH;
+        }
         if (Double.isNaN(pixels) || pixels <= 0) {
             pixels = 64.0;
         }
