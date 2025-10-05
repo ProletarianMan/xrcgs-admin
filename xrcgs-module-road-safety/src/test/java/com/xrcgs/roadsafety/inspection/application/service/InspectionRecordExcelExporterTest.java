@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.nio.file.Paths;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
@@ -27,11 +28,15 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.FileSystemResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 巡查记录 Excel 导出能力的集成测试，验证写入文本与分页照片能力。
  */
 class InspectionRecordExcelExporterTest {
+
+    private static final Logger log = LoggerFactory.getLogger(InspectionRecordExcelExporterTest.class);
 
     @TempDir
     Path tempDir;
@@ -74,7 +79,12 @@ class InspectionRecordExcelExporterTest {
                 .exportFileName("record.xlsx")
                 .build();
 
-        Path output = exporter.export(record, tempDir);
+        Path exportDir = Files.createDirectories(Paths.get("src/test/resources/export"));
+        Path output = exportDir.resolve("record.xlsx");
+        Files.deleteIfExists(output);
+
+        output = exporter.export(record, exportDir);
+        log.info("巡查记录导出文件路径: {}", output.toAbsolutePath());
         assertThat(Files.exists(output)).isTrue();
 
         try (InputStream inputStream = Files.newInputStream(output);
