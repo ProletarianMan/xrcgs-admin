@@ -31,6 +31,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.Units;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -156,6 +157,18 @@ public class InspectionRecordExcelExporter {
         row.setHeightInPoints(height);
     }
 
+    private void setCellValue(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
+        XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
+        row.setZeroHeight(false);
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+    }
+
+    private void adjustRowHeight(XSSFSheet sheet, int rowIndex, float height) {
+        XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
+        row.setHeightInPoints(height);
+    }
+
     private void fillHandlingSection(Sheet sheet, InspectionRecord record) {
         // 构建巡查概述+处理情况的正文，按模板顺序组织段落。
         StringBuilder builder = new StringBuilder();
@@ -170,6 +183,38 @@ public class InspectionRecordExcelExporter {
     private void fillRemarks(Sheet sheet, InspectionRecord record) {
         String remark = buildRemark(record);
         setCellToRightOfLabel(sheet, "备注", remark);
+    }
+
+    private void fillAuditTrail(XSSFSheet sheet, InspectionRecord record) {
+        int startRowIndex = Math.max(sheet.getLastRowNum() + 2, 30);
+        XSSFRow keyRow = Optional.ofNullable(sheet.getRow(startRowIndex)).orElseGet(() -> sheet.createRow(startRowIndex));
+        XSSFRow valueRow = Optional.ofNullable(sheet.getRow(startRowIndex + 1)).orElseGet(() -> sheet.createRow(startRowIndex + 1));
+        keyRow.setZeroHeight(true);
+        valueRow.setZeroHeight(true);
+
+        writeAuditCell(keyRow, 0, "createdBy");
+        writeAuditCell(valueRow, 0, normalizeAuditValue(record.getCreatedBy()));
+
+        writeAuditCell(keyRow, 1, "createdAt");
+        writeAuditCell(valueRow, 1, formatDateTime(record.getCreatedAt()));
+
+        writeAuditCell(keyRow, 2, "updatedAt");
+        writeAuditCell(valueRow, 2, formatDateTime(record.getUpdatedAt()));
+
+        writeAuditCell(keyRow, 3, "exportedBy");
+        writeAuditCell(valueRow, 3, normalizeAuditValue(record.getExportedBy()));
+
+        writeAuditCell(keyRow, 4, "exportedAt");
+        writeAuditCell(valueRow, 4, formatDateTime(record.getExportedAt()));
+    }
+
+    private void writeAuditCell(Row row, int columnIndex, String value) {
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+    }
+
+    private String normalizeAuditValue(String value) {
+        return StringUtils.hasText(value) ? value.trim() : "";
     }
 
     private void fillAuditTrail(XSSFSheet sheet, InspectionRecord record) {
