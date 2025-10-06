@@ -58,9 +58,12 @@ public class InspectionRecordExcelExporter {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy年MM月dd日 HH:mm");
     private static final int PHOTOS_PER_PAGE = 2;
-    private static final double PHOTO_MARGIN_POINTS = 2.0;
     private static final long EMU_PER_PIXEL = 9525L;
     private static final long EMU_PER_POINT = 12700L;
+    private static final double PHOTO_WIDTH_CM = 17.66;
+    private static final double PHOTO_HEIGHT_CM = 10.20;
+    private static final long PHOTO_WIDTH_EMU = Units.toEMU(centimetersToPoints(PHOTO_WIDTH_CM));
+    private static final long PHOTO_HEIGHT_EMU = Units.toEMU(centimetersToPoints(PHOTO_HEIGHT_CM));
 
     private static final List<PhotoSlotTemplate> PAGE_PHOTO_SLOTS = List.of(
             new PhotoSlotTemplate(1, 2, 4, 26, 27, 27, 1),
@@ -346,40 +349,41 @@ public class InspectionRecordExcelExporter {
     }
 
     private void configureAnchor(XSSFSheet sheet, XSSFClientAnchor anchor, PhotoSlotTemplate slot, ImageResource resource) {
-        long slotWidthEmu = calculateSlotWidthEmu(sheet, slot);
-        long slotHeightEmu = calculateSlotHeightEmu(sheet, slot);
-        long marginEmu = Units.toEMU(PHOTO_MARGIN_POINTS);
+        long slotWidthEmu = Math.max(EMU_PER_PIXEL, calculateSlotWidthEmu(sheet, slot));
+        long slotHeightEmu = Math.max(EMU_PER_POINT, calculateSlotHeightEmu(sheet, slot));
 
-        long innerWidthEmu = Math.max(0, slotWidthEmu - 2 * marginEmu);
-        long innerHeightEmu = Math.max(0, slotHeightEmu - 2 * marginEmu);
+        long maxWidth = Math.max(EMU_PER_PIXEL, Math.min(slotWidthEmu, PHOTO_WIDTH_EMU));
+        long maxHeight = Math.max(EMU_PER_POINT, Math.min(slotHeightEmu, PHOTO_HEIGHT_EMU));
 
-        long availableWidth = innerWidthEmu > 0 ? innerWidthEmu : slotWidthEmu;
-        long availableHeight = innerHeightEmu > 0 ? innerHeightEmu : slotHeightEmu;
-        if (availableWidth <= 0) {
-            availableWidth = Math.max(slotWidthEmu, EMU_PER_PIXEL);
-        }
-        if (availableHeight <= 0) {
-            availableHeight = Math.max(slotHeightEmu, EMU_PER_POINT);
-        }
+        long imageWidth = resource.widthPx() > 0 ? Math.round(resource.widthPx() * EMU_PER_PIXEL) : maxWidth;
+        long imageHeight = resource.heightPx() > 0 ? Math.round(resource.heightPx() * EMU_PER_PIXEL) : maxHeight;
 
-        long imageWidth = resource.widthPx() > 0 ? Math.round(resource.widthPx() * EMU_PER_PIXEL) : availableWidth;
-        long imageHeight = resource.heightPx() > 0 ? Math.round(resource.heightPx() * EMU_PER_PIXEL) : availableHeight;
-
-        double widthScale = availableWidth > 0 ? (double) availableWidth / imageWidth : 1.0;
-        double heightScale = availableHeight > 0 ? (double) availableHeight / imageHeight : 1.0;
+        double widthScale = maxWidth / (double) imageWidth;
+        double heightScale = maxHeight / (double) imageHeight;
         double scale = Math.min(widthScale, heightScale);
-        scale = Math.min(scale, 1.0);
+        if (Double.isNaN(scale) || Double.isInfinite(scale) || scale <= 0) {
+            scale = 1.0;
+        }
 
-        long scaledWidth = Math.max(1L, Math.round(imageWidth * scale));
-        long scaledHeight = Math.max(1L, Math.round(imageHeight * scale));
+        long scaledWidth = Math.max(EMU_PER_PIXEL, Math.round(imageWidth * scale));
+        long scaledHeight = Math.max(EMU_PER_POINT, Math.round(imageHeight * scale));
 
-        long[] horizontal = computeAnchoredOffsets(slotWidthEmu, scaledWidth, marginEmu, innerWidthEmu > 0);
-        long horizontalStart = horizontal[0];
-        long horizontalEnd = horizontal[1];
+        if (scaledWidth > slotWidthEmu) {
+            double adjust = slotWidthEmu / (double) scaledWidth;
+            scaledWidth = Math.max(EMU_PER_PIXEL, Math.round(scaledWidth * adjust));
+            scaledHeight = Math.max(EMU_PER_POINT, Math.round(scaledHeight * adjust));
+        }
+        if (scaledHeight > slotHeightEmu) {
+            double adjust = slotHeightEmu / (double) scaledHeight;
+            scaledWidth = Math.max(EMU_PER_PIXEL, Math.round(scaledWidth * adjust));
+            scaledHeight = Math.max(EMU_PER_POINT, Math.round(scaledHeight * adjust));
+        }
 
-        long[] vertical = computeAnchoredOffsets(slotHeightEmu, scaledHeight, marginEmu, innerHeightEmu > 0);
-        long verticalStart = vertical[0];
-        long verticalEnd = vertical[1];
+        long horizontalStart = Math.max(0, (slotWidthEmu - scaledWidth) / 2);
+        long verticalStart = Math.max(0, (slotHeightEmu - scaledHeight) / 2);
+
+        long horizontalEnd = Math.min(slotWidthEmu, horizontalStart + scaledWidth);
+        long verticalEnd = Math.min(slotHeightEmu, verticalStart + scaledHeight);
 
         AnchorCoordinate columnStart = resolveColumnCoordinate(sheet, slot.col1() - 1, slot.col2() - 1, horizontalStart);
         AnchorCoordinate columnEnd = resolveColumnCoordinate(sheet, slot.col1() - 1, slot.col2() - 1, horizontalEnd);
@@ -394,36 +398,6 @@ public class InspectionRecordExcelExporter {
         anchor.setDy1(rowStart.offset());
         anchor.setRow2(rowEnd.index());
         anchor.setDy2(rowEnd.offset());
-    }
-
-    private long[] computeAnchoredOffsets(long slotSizeEmu, long scaledSizeEmu, long marginEmu, boolean useMargin) {
-        long boundedScaledSize = Math.min(scaledSizeEmu, slotSizeEmu);
-        long effectiveMargin = useMargin ? Math.min(marginEmu, slotSizeEmu / 2) : 0;
-        long availableSpan = slotSizeEmu - 2 * effectiveMargin;
-        if (availableSpan < 0) {
-            availableSpan = slotSizeEmu;
-            effectiveMargin = 0;
-        }
-
-        if (boundedScaledSize > availableSpan && availableSpan > 0) {
-            double adjustRatio = (double) availableSpan / boundedScaledSize;
-            boundedScaledSize = Math.max(1L, Math.round(boundedScaledSize * adjustRatio));
-        }
-
-        long leftover = Math.max(0, availableSpan - boundedScaledSize);
-        long leadingPadding = leftover / 2;
-        long trailingPadding = leftover - leadingPadding;
-
-        long start = effectiveMargin + leadingPadding;
-        long end = slotSizeEmu - effectiveMargin - trailingPadding;
-
-        if (end <= start) {
-            end = Math.min(slotSizeEmu - effectiveMargin, start + Math.max(boundedScaledSize, EMU_PER_PIXEL));
-            if (end <= start) {
-                end = Math.min(slotSizeEmu, start + Math.max(boundedScaledSize, EMU_PER_PIXEL));
-            }
-        }
-        return new long[]{Math.max(0, start), Math.max(start + 1, Math.min(slotSizeEmu, end))};
     }
 
     private long calculateSlotWidthEmu(XSSFSheet sheet, PhotoSlotTemplate slot) {
@@ -665,6 +639,9 @@ public class InspectionRecordExcelExporter {
             if (candidate == null) {
                 candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             }
+            if (candidate == null) {
+                candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+            }
             if (candidate.getCellType() == CellType.STRING) {
                 String text = candidate.getStringCellValue();
                 if (text != null && text.contains("：")) {
@@ -805,6 +782,10 @@ public class InspectionRecordExcelExporter {
             return DEFAULT_EXPORT_NAME;
         }
         return ensureExcelExtension(fileName);
+    }
+
+    private static double centimetersToPoints(double centimeters) {
+        return centimeters * 72.0 / 2.54;
     }
 
     private record PhotoSlotTemplate(int col1, int row1, int col2, int row2,
