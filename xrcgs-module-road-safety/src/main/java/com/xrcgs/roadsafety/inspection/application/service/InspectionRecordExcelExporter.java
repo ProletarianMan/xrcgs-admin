@@ -450,7 +450,15 @@ public class InspectionRecordExcelExporter {
         if (sheet.isColumnHidden(columnIndex)) {
             return EMU_PER_PIXEL;
         }
-        double pixels = sheet.getColumnWidth(columnIndex) / 256.0 * Units.DEFAULT_CHARACTER_WIDTH;
+
+        double pixels = Double.NaN;
+        if (sheet instanceof XSSFSheet xssfSheet) {
+            pixels = xssfSheet.getColumnWidthInPixels(columnIndex);
+        }
+
+        if (Double.isNaN(pixels) || pixels <= 0) {
+            pixels = sheet.getColumnWidth(columnIndex) / 256.0 * Units.DEFAULT_CHARACTER_WIDTH;
+        }
         if (Double.isNaN(pixels) || pixels <= 0) {
             double fallbackCharacters = sheet.getDefaultColumnWidth();
             pixels = fallbackCharacters * Units.DEFAULT_CHARACTER_WIDTH;
@@ -624,6 +632,9 @@ public class InspectionRecordExcelExporter {
         }
         for (int column = labelColumn + 1; column <= lastCellNum; column++) {
             Cell candidate = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            if (candidate == null) {
+                candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+            }
             if (candidate == null) {
                 candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             }
