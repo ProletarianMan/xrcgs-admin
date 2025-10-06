@@ -118,6 +118,7 @@ class InspectionRecordExcelExporterTest {
             String handlingText = readValueRightOfLabel(infoSheet, "巡查、处理情况");
             String normalizedHandling = handlingText.replace("\r\n", "\n");
             assertThat(normalizedHandling)
+                    .startsWith("巡查、处理情况：")
                     .contains("巡查内容：路面、桥涵专项巡查。")
                     .contains("问题描述：发现1处沉陷。")
                     .contains("处理情况（原始记录）：现场设置警戒并安排抢修。")
@@ -134,6 +135,7 @@ class InspectionRecordExcelExporterTest {
 
             String remarkText = readValueRightOfLabel(infoSheet, "备注").replace("\r\n", "\n");
             assertThat(remarkText)
+                    .startsWith("备注：")
                     .contains("现场秩序良好。")
                     .contains("创建：张三 (2024年12月01日 09:30)")
                     .contains("最后更新时间：2024年12月01日 18:00")
@@ -215,6 +217,10 @@ class InspectionRecordExcelExporterTest {
         if (labelCell == null) {
             return null;
         }
+        CellRangeAddress labelRegion = findMergedRegionContaining(sheet, labelCell);
+        if (labelRegion != null && labelRegion.getFirstColumn() == labelCell.getColumnIndex()) {
+            return labelCell;
+        }
         Row row = sheet.getRow(labelCell.getRowIndex());
         int labelColumn = labelCell.getColumnIndex();
         CellRangeAddress nearest = null;
@@ -252,6 +258,15 @@ class InspectionRecordExcelExporterTest {
             return candidate;
         }
         return row.getCell(labelColumn + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+    }
+
+    private CellRangeAddress findMergedRegionContaining(Sheet sheet, Cell cell) {
+        for (CellRangeAddress region : sheet.getMergedRegions()) {
+            if (region.isInRange(cell.getRowIndex(), cell.getColumnIndex())) {
+                return region;
+            }
+        }
+        return null;
     }
 
     private Cell findLabelCell(Sheet sheet, String label) {

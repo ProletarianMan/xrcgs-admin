@@ -581,6 +581,14 @@ public class InspectionRecordExcelExporter {
 
     private void setCellToRightOfLabel(Sheet sheet, String label, String value) {
         findCellByLabel(sheet, label).ifPresent(labelCell -> {
+            CellRangeAddress labelRegion = findMergedRegionContaining(sheet, labelCell);
+            String normalizedValue = Optional.ofNullable(value).orElse("");
+            if (labelRegion != null && labelRegion.getFirstColumn() == labelCell.getColumnIndex()) {
+                String prefix = extractLabelPrefix(labelCell);
+                labelCell.setCellValue(prefix + normalizedValue);
+                return;
+            }
+
             Cell target = locateTargetCell(sheet, labelCell);
             if (target == null) {
                 Row row = sheet.getRow(labelCell.getRowIndex());
@@ -592,8 +600,35 @@ public class InspectionRecordExcelExporter {
                     return;
                 }
             }
-            target.setCellValue(Optional.ofNullable(value).orElse(""));
+            target.setCellValue(normalizedValue);
         });
+    }
+
+    private CellRangeAddress findMergedRegionContaining(Sheet sheet, Cell cell) {
+        for (CellRangeAddress region : sheet.getMergedRegions()) {
+            if (region.isInRange(cell.getRowIndex(), cell.getColumnIndex())) {
+                return region;
+            }
+        }
+        return null;
+    }
+
+    private String extractLabelPrefix(Cell labelCell) {
+        if (labelCell == null || labelCell.getCellType() != CellType.STRING) {
+            return "";
+        }
+        String text = Optional.ofNullable(labelCell.getStringCellValue()).orElse("");
+        if (text.isEmpty()) {
+            return "";
+        }
+        int newlineIndex = text.indexOf('\n');
+        if (newlineIndex >= 0) {
+            return text.substring(0, newlineIndex + 1);
+        }
+        if (text.endsWith("\r")) {
+            return text;
+        }
+        return text + System.lineSeparator();
     }
 
     private Cell locateTargetCell(Sheet sheet, Cell labelCell) {
@@ -614,6 +649,9 @@ public class InspectionRecordExcelExporter {
         }
         for (int column = labelColumn + 1; column <= lastCellNum; column++) {
             Cell candidate = row.getCell(column, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            if (candidate == null) {
+                candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+            }
             if (candidate == null) {
                 candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             }
