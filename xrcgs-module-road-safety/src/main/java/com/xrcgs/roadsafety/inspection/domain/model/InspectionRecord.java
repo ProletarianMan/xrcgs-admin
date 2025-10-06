@@ -27,6 +27,11 @@ public class InspectionRecord {
     private LocalDate date;
 
     /**
+     * 单位名称，用于表头展示。
+     */
+    private String unitName;
+
+    /**
      * 天气情况。
      */
     private String weather;
@@ -35,6 +40,11 @@ public class InspectionRecord {
      * 巡查人员或班组。
      */
     private String patrolTeam;
+
+    /**
+     * 巡查车辆。
+     */
+    private String patrolVehicle;
 
     /**
      * 巡查路线、里程与桩号。
@@ -67,6 +77,16 @@ public class InspectionRecord {
      */
     @Builder.Default
     private List<PhotoItem> photos = new ArrayList<>();
+
+    /**
+     * 巡查车辆、装备、案件等交接情况。
+     */
+    private String handoverSummary;
+
+    /**
+     * 备注。
+     */
+    private String remark;
 
     private String createdBy;
     private LocalDateTime createdAt;
