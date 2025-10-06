@@ -113,7 +113,10 @@ class InspectionRecordExcelExporterTest {
             assertThat(readValueRightOfLabel(infoSheet, "天气情况")).isEqualTo("晴");
             assertThat(readValueRightOfLabel(infoSheet, "巡查人员")).isEqualTo("巡查一队");
             assertThat(readValueRightOfLabel(infoSheet, "巡查车辆")).isEqualTo("巡逻车A123");
-            assertThat(readValueRightOfLabel(infoSheet, "巡查车辆、装备、案件等交接情况")).isEqualTo("交接巡查车辆与装备完毕。");
+            String handoverText = readValueRightOfLabel(infoSheet, "巡查车辆、装备、案件等交接情况");
+            assertThat(handoverText)
+                    .startsWith("巡查车辆、装备、案件等交接情况：")
+                    .contains("交接巡查车辆与装备完毕。");
 
             String handlingText = readValueRightOfLabel(infoSheet, "巡查、处理情况");
             String normalizedHandling = handlingText.replace("\r\n", "\n");

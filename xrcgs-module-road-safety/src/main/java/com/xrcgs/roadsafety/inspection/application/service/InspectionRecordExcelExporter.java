@@ -658,6 +658,9 @@ public class InspectionRecordExcelExporter {
             if (candidate == null) {
                 candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             }
+            if (candidate == null) {
+                candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+            }
             if (candidate.getCellType() == CellType.STRING) {
                 String text = candidate.getStringCellValue();
                 if (text != null && text.contains("：")) {
