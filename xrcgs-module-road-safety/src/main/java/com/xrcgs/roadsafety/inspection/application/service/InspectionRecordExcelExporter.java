@@ -371,16 +371,44 @@ public class InspectionRecordExcelExporter {
         long scaledHeight = Math.max(1L, Math.round(imageHeight * scale));
 
         long horizontalStart = Math.max(marginEmu, (slotWidthEmu - scaledWidth) / 2);
-        long verticalStart = Math.max(marginEmu, (slotHeightEmu - scaledHeight) / 2);
-        if (horizontalStart + scaledWidth > slotWidthEmu) {
-            horizontalStart = Math.max(marginEmu, slotWidthEmu - scaledWidth);
+        long horizontalEnd = horizontalStart + scaledWidth;
+        long rightMargin = Math.max(0, slotWidthEmu - horizontalEnd);
+        if (rightMargin < marginEmu) {
+            long adjustment = marginEmu - rightMargin;
+            horizontalStart = Math.max(marginEmu, horizontalStart - adjustment);
+            horizontalEnd = horizontalStart + scaledWidth;
         }
-        if (verticalStart + scaledHeight > slotHeightEmu) {
-            verticalStart = Math.max(marginEmu, slotHeightEmu - scaledHeight);
+        if (horizontalStart < marginEmu) {
+            horizontalStart = marginEmu;
+            horizontalEnd = Math.min(slotWidthEmu - marginEmu, horizontalStart + scaledWidth);
+        }
+        if (horizontalEnd > slotWidthEmu - marginEmu) {
+            horizontalEnd = slotWidthEmu - marginEmu;
+            horizontalStart = Math.max(marginEmu, horizontalEnd - scaledWidth);
+        }
+        if (horizontalEnd <= horizontalStart) {
+            horizontalEnd = Math.min(slotWidthEmu, horizontalStart + Math.max(scaledWidth, EMU_PER_PIXEL));
         }
 
-        long horizontalEnd = Math.min(slotWidthEmu, Math.max(horizontalStart + scaledWidth, horizontalStart + 1));
-        long verticalEnd = Math.min(slotHeightEmu, Math.max(verticalStart + scaledHeight, verticalStart + 1));
+        long verticalStart = Math.max(marginEmu, (slotHeightEmu - scaledHeight) / 2);
+        long verticalEnd = verticalStart + scaledHeight;
+        long bottomMargin = Math.max(0, slotHeightEmu - verticalEnd);
+        if (bottomMargin < marginEmu) {
+            long adjustment = marginEmu - bottomMargin;
+            verticalStart = Math.max(marginEmu, verticalStart - adjustment);
+            verticalEnd = verticalStart + scaledHeight;
+        }
+        if (verticalStart < marginEmu) {
+            verticalStart = marginEmu;
+            verticalEnd = Math.min(slotHeightEmu - marginEmu, verticalStart + scaledHeight);
+        }
+        if (verticalEnd > slotHeightEmu - marginEmu) {
+            verticalEnd = slotHeightEmu - marginEmu;
+            verticalStart = Math.max(marginEmu, verticalEnd - scaledHeight);
+        }
+        if (verticalEnd <= verticalStart) {
+            verticalEnd = Math.min(slotHeightEmu, verticalStart + Math.max(scaledHeight, EMU_PER_POINT));
+        }
 
         AnchorCoordinate columnStart = resolveColumnCoordinate(sheet, slot.col1() - 1, slot.col2() - 1, horizontalStart);
         AnchorCoordinate columnEnd = resolveColumnCoordinate(sheet, slot.col1() - 1, slot.col2() - 1, horizontalEnd);
@@ -589,19 +617,18 @@ public class InspectionRecordExcelExporter {
             if (candidate == null) {
                 candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
             }
+            if (candidate == null) {
+                candidate = row.getCell(column, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+            }
             if (candidate.getCellType() == CellType.STRING) {
                 String text = candidate.getStringCellValue();
                 if (text != null && text.contains("：")) {
                     continue;
                 }
-                if (text == null || text.isBlank()) {
-                    return candidate;
-                }
-            } else {
-                return candidate;
             }
+            return candidate;
         }
-        return row.getCell(labelColumn + 1);
+        return row.getCell(labelColumn + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
     }
 
     private Cell findMergedTarget(Sheet sheet, Cell labelCell, Row row) {
@@ -609,7 +636,9 @@ public class InspectionRecordExcelExporter {
         int rowIndex = labelCell.getRowIndex();
         CellRangeAddress nearest = null;
         for (CellRangeAddress region : sheet.getMergedRegions()) {
-            if (region.getFirstRow() == rowIndex && region.getLastRow() == rowIndex && region.getFirstColumn() > labelColumn) {
+            if (region.getFirstColumn() > labelColumn
+                    && region.getFirstRow() <= rowIndex
+                    && region.getLastRow() >= rowIndex) {
                 if (nearest == null || region.getFirstColumn() < nearest.getFirstColumn()) {
                     nearest = region;
                 }
@@ -618,7 +647,11 @@ public class InspectionRecordExcelExporter {
         if (nearest == null) {
             return null;
         }
-        return row.getCell(nearest.getFirstColumn());
+        Row targetRow = sheet.getRow(nearest.getFirstRow());
+        if (targetRow == null) {
+            targetRow = sheet.createRow(nearest.getFirstRow());
+        }
+        return targetRow.getCell(nearest.getFirstColumn(), Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
     }
 
     private Optional<Cell> findCellByLabel(Sheet sheet, String label) {

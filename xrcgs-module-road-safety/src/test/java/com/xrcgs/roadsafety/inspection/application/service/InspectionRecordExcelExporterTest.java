@@ -219,16 +219,20 @@ class InspectionRecordExcelExporterTest {
         int labelColumn = labelCell.getColumnIndex();
         CellRangeAddress nearest = null;
         for (CellRangeAddress region : sheet.getMergedRegions()) {
-            if (region.getFirstRow() == labelCell.getRowIndex()
-                    && region.getLastRow() == labelCell.getRowIndex()
-                    && region.getFirstColumn() > labelColumn) {
+            if (region.getFirstColumn() > labelColumn
+                    && region.getFirstRow() <= labelCell.getRowIndex()
+                    && region.getLastRow() >= labelCell.getRowIndex()) {
                 if (nearest == null || region.getFirstColumn() < nearest.getFirstColumn()) {
                     nearest = region;
                 }
             }
         }
         if (nearest != null) {
-            Cell mergedCell = row.getCell(nearest.getFirstColumn());
+            Row targetRow = sheet.getRow(nearest.getFirstRow());
+            if (targetRow == null) {
+                targetRow = sheet.createRow(nearest.getFirstRow());
+            }
+            Cell mergedCell = targetRow.getCell(nearest.getFirstColumn());
             if (mergedCell != null) {
                 return mergedCell;
             }
@@ -247,7 +251,7 @@ class InspectionRecordExcelExporterTest {
             }
             return candidate;
         }
-        return row.getCell(labelColumn + 1);
+        return row.getCell(labelColumn + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
     }
 
     private Cell findLabelCell(Sheet sheet, String label) {
