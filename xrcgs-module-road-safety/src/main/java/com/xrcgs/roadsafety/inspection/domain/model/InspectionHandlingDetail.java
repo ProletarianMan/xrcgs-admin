@@ -11,14 +11,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 巡查照片信息，包含文件路径以及对应说明。
+ * 巡查记录处理分类明细，对应 road_inspection_handling_detail 表。
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("road_inspection_photo")
-public class PhotoItem {
+@TableName("road_inspection_handling_detail")
+public class InspectionHandlingDetail {
 
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
@@ -26,24 +26,18 @@ public class PhotoItem {
     @TableField("record_id")
     private Long recordId;
 
-    @TableField("file_id")
-    private Long fileId;
+    @TableField("category_code")
+    private String categoryCode;
 
-    /**
-     * 对应的文字说明，写入在图片下方。
-     */
-    @TableField("description")
-    private String description;
+    @TableField("category_name")
+    private String categoryName;
 
-    @TableField("sort_order")
-    private Integer sortOrder;
+    @TableField("detail_text")
+    private String detailText;
+
+    @TableField("detail_order")
+    private Integer detailOrder;
 
     @TableField("created_at")
     private LocalDateTime createdAt;
-
-    /**
-     * 图片所在的本地路径或网络下载后的缓存路径。
-     */
-    @TableField(exist = false)
-    private String imagePath;
 }
