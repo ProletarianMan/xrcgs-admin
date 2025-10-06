@@ -73,12 +73,15 @@ class InspectionRecordExcelExporterTest {
                 .unitName("乌鲁木齐葛洲坝电建路桥绕城高速公路有限公司")
                 .weather("晴")
                 .patrolTeam("巡查一队")
+                .patrolVehicle("巡逻车A123")
                 .location("K10+000-K20+000")
                 .inspectionContent("路面、桥涵专项巡查。")
                 .issuesFound("发现1处沉陷。")
                 .handlingSituationRaw("现场设置警戒并安排抢修。")
                 .handlingDetails(categoryGroup)
+                .handoverSummary("交接巡查车辆与装备完毕。")
                 .photos(photos)
+                .remark("现场秩序良好。")
                 .createdBy("张三")
                 .createdAt(LocalDateTime.of(2024, 12, 1, 9, 30))
                 .updatedAt(LocalDateTime.of(2024, 12, 1, 18, 0))
@@ -109,10 +112,15 @@ class InspectionRecordExcelExporterTest {
             assertThat(readValueRightOfLabel(infoSheet, "巡查时间")).contains("2024年12月01日");
             assertThat(readValueRightOfLabel(infoSheet, "天气情况")).isEqualTo("晴");
             assertThat(readValueRightOfLabel(infoSheet, "巡查人员")).isEqualTo("巡查一队");
+            assertThat(readValueRightOfLabel(infoSheet, "巡查车辆")).isEqualTo("巡逻车A123");
+            assertThat(readValueRightOfLabel(infoSheet, "巡查车辆、装备、案件等交接情况")).isEqualTo("交接巡查车辆与装备完毕。");
 
             String handlingText = readValueRightOfLabel(infoSheet, "巡查、处理情况");
             String normalizedHandling = handlingText.replace("\r\n", "\n");
             assertThat(normalizedHandling)
+                    .contains("巡查内容：路面、桥涵专项巡查。")
+                    .contains("问题描述：发现1处沉陷。")
+                    .contains("处理情况（原始记录）：现场设置警戒并安排抢修。")
                     .contains("一、道路病害或损坏情况：")
                     .contains("- 路面沉陷处设置警示标志。")
                     .contains("二、交通事故或清障救援情况：")
@@ -126,6 +134,7 @@ class InspectionRecordExcelExporterTest {
 
             String remarkText = readValueRightOfLabel(infoSheet, "备注").replace("\r\n", "\n");
             assertThat(remarkText)
+                    .contains("现场秩序良好。")
                     .contains("创建：张三 (2024年12月01日 09:30)")
                     .contains("最后更新时间：2024年12月01日 18:00")
                     .contains("导出：李四 (2024年12月01日 18:30)");
@@ -219,7 +228,10 @@ class InspectionRecordExcelExporterTest {
             }
         }
         if (nearest != null) {
-            return row.getCell(nearest.getFirstColumn());
+            Cell mergedCell = row.getCell(nearest.getFirstColumn());
+            if (mergedCell != null) {
+                return mergedCell;
+            }
         }
         short lastCellNum = row.getLastCellNum();
         if (lastCellNum < 0) {
@@ -230,17 +242,10 @@ class InspectionRecordExcelExporterTest {
             if (candidate == null) {
                 continue;
             }
-            if (candidate.getCellType() == CellType.STRING) {
-                String text = candidate.getStringCellValue();
-                if (text != null && text.contains("：")) {
-                    continue;
-                }
-                if (text == null || text.isBlank()) {
-                    return candidate;
-                }
-            } else {
-                return candidate;
+            if (isLabelLikeCell(candidate)) {
+                continue;
             }
+            return candidate;
         }
         return row.getCell(labelColumn + 1);
     }
@@ -254,5 +259,17 @@ class InspectionRecordExcelExporterTest {
             }
         }
         return null;
+    }
+
+    private boolean isLabelLikeCell(Cell cell) {
+        if (cell.getCellType() != CellType.STRING) {
+            return false;
+        }
+        String text = cell.getStringCellValue();
+        if (text == null) {
+            return false;
+        }
+        String trimmed = text.trim();
+        return trimmed.endsWith("：") && !trimmed.contains("\n") && !trimmed.contains("\r");
     }
 }

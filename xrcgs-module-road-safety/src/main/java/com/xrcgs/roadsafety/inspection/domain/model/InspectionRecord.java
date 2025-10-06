@@ -42,6 +42,11 @@ public class InspectionRecord {
     private String patrolTeam;
 
     /**
+     * 巡查车辆。
+     */
+    private String patrolVehicle;
+
+    /**
      * 巡查路线、里程与桩号。
      */
     private String location;
@@ -72,6 +77,16 @@ public class InspectionRecord {
      */
     @Builder.Default
     private List<PhotoItem> photos = new ArrayList<>();
+
+    /**
+     * 巡查车辆、装备、案件等交接情况。
+     */
+    private String handoverSummary;
+
+    /**
+     * 备注。
+     */
+    private String remark;
 
     private String createdBy;
     private LocalDateTime createdAt;

@@ -139,8 +139,22 @@ public class InspectionRecordExcelExporter {
         setCellToRightOfLabel(sheet, "巡查时间", formatDate(record.getDate()));
         setCellToRightOfLabel(sheet, "天气情况", defaultText(record.getWeather()));
         setCellToRightOfLabel(sheet, "巡查人员", defaultText(record.getPatrolTeam()));
+        setCellToRightOfLabel(sheet, "巡查车辆", defaultText(record.getPatrolVehicle()));
         setCellToRightOfLabel(sheet, "巡查里程", defaultText(record.getLocation()));
         setCellToRightOfLabel(sheet, "巡查路段", defaultText(record.getLocation()));
+        setCellToRightOfLabel(sheet, "巡查车辆、装备、案件等交接情况", defaultText(record.getHandoverSummary()));
+    }
+
+    private void setCellValue(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
+        XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
+        row.setZeroHeight(false);
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+    }
+
+    private void adjustRowHeight(XSSFSheet sheet, int rowIndex, float height) {
+        XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
+        row.setHeightInPoints(height);
     }
 
     private void setCellValue(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
@@ -168,9 +182,39 @@ public class InspectionRecordExcelExporter {
 
     private void fillRemarks(Sheet sheet, InspectionRecord record) {
         String remark = buildRemark(record);
-        if (StringUtils.hasText(remark)) {
-            setCellToRightOfLabel(sheet, "备注", remark);
-        }
+        setCellToRightOfLabel(sheet, "备注", remark);
+    }
+
+    private void fillAuditTrail(XSSFSheet sheet, InspectionRecord record) {
+        int startRowIndex = Math.max(sheet.getLastRowNum() + 2, 30);
+        XSSFRow keyRow = Optional.ofNullable(sheet.getRow(startRowIndex)).orElseGet(() -> sheet.createRow(startRowIndex));
+        XSSFRow valueRow = Optional.ofNullable(sheet.getRow(startRowIndex + 1)).orElseGet(() -> sheet.createRow(startRowIndex + 1));
+        keyRow.setZeroHeight(true);
+        valueRow.setZeroHeight(true);
+
+        writeAuditCell(keyRow, 0, "createdBy");
+        writeAuditCell(valueRow, 0, normalizeAuditValue(record.getCreatedBy()));
+
+        writeAuditCell(keyRow, 1, "createdAt");
+        writeAuditCell(valueRow, 1, formatDateTime(record.getCreatedAt()));
+
+        writeAuditCell(keyRow, 2, "updatedAt");
+        writeAuditCell(valueRow, 2, formatDateTime(record.getUpdatedAt()));
+
+        writeAuditCell(keyRow, 3, "exportedBy");
+        writeAuditCell(valueRow, 3, normalizeAuditValue(record.getExportedBy()));
+
+        writeAuditCell(keyRow, 4, "exportedAt");
+        writeAuditCell(valueRow, 4, formatDateTime(record.getExportedAt()));
+    }
+
+    private void writeAuditCell(Row row, int columnIndex, String value) {
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+    }
+
+    private String normalizeAuditValue(String value) {
+        return StringUtils.hasText(value) ? value.trim() : "";
     }
 
     private void fillAuditTrail(XSSFSheet sheet, InspectionRecord record) {
@@ -207,6 +251,9 @@ public class InspectionRecordExcelExporter {
 
     private String buildRemark(InspectionRecord record) {
         List<String> lines = new ArrayList<>();
+        if (StringUtils.hasText(record.getRemark())) {
+            lines.add(record.getRemark().trim());
+        }
         if (StringUtils.hasText(record.getCreatedBy()) || record.getCreatedAt() != null) {
             lines.add("创建：" + buildNameWithTime(record.getCreatedBy(), record.getCreatedAt()));
         }
@@ -219,7 +266,10 @@ public class InspectionRecordExcelExporter {
         if (StringUtils.hasText(record.getExportFileName())) {
             lines.add("导出文件：" + ensureExcelExtension(record.getExportFileName()));
         }
-        return lines.isEmpty() ? "" : String.join(System.lineSeparator(), lines);
+        if (lines.isEmpty()) {
+            lines.add("无");
+        }
+        return String.join(System.lineSeparator(), lines);
     }
 
     private String buildNameWithTime(String name, LocalDateTime time) {
@@ -340,15 +390,18 @@ public class InspectionRecordExcelExporter {
     }
 
     private void configureAnchor(XSSFSheet sheet, XSSFClientAnchor anchor, PhotoSlotTemplate slot, ImageResource resource) {
-        anchor.setCol1(slot.col1() - 1);
-        anchor.setRow1(slot.row1() - 1);
-
         long slotWidthEmu = calculateSlotWidthEmu(sheet, slot);
         long slotHeightEmu = calculateSlotHeightEmu(sheet, slot);
         long marginEmu = Units.toEMU(PHOTO_MARGIN_POINTS);
 
         long availableWidth = Math.max(slotWidthEmu - 2 * marginEmu, slotWidthEmu / 2);
         long availableHeight = Math.max(slotHeightEmu - 2 * marginEmu, slotHeightEmu / 2);
+        if (availableWidth <= 0) {
+            availableWidth = Math.max(slotWidthEmu, EMU_PER_PIXEL);
+        }
+        if (availableHeight <= 0) {
+            availableHeight = Math.max(slotHeightEmu, EMU_PER_POINT);
+        }
 
         long imageWidth = resource.widthPx() > 0 ? Math.round(resource.widthPx() * EMU_PER_PIXEL) : availableWidth;
         long imageHeight = resource.heightPx() > 0 ? Math.round(resource.heightPx() * EMU_PER_PIXEL) : availableHeight;
@@ -361,18 +414,31 @@ public class InspectionRecordExcelExporter {
         long scaledWidth = Math.max(1L, Math.round(imageWidth * scale));
         long scaledHeight = Math.max(1L, Math.round(imageHeight * scale));
 
-        long widthFromLeft = Math.min(slotWidthEmu - 1, marginEmu + scaledWidth);
-        long heightFromTop = Math.min(slotHeightEmu - 1, marginEmu + scaledHeight);
+        long horizontalStart = Math.max(marginEmu, (slotWidthEmu - scaledWidth) / 2);
+        long verticalStart = Math.max(marginEmu, (slotHeightEmu - scaledHeight) / 2);
+        if (horizontalStart + scaledWidth > slotWidthEmu) {
+            horizontalStart = Math.max(marginEmu, slotWidthEmu - scaledWidth);
+        }
+        if (verticalStart + scaledHeight > slotHeightEmu) {
+            verticalStart = Math.max(marginEmu, slotHeightEmu - scaledHeight);
+        }
 
-        AnchorCoordinate columnExtent = calculateColumnExtent(sheet, slot.col1() - 1, slot.col2() - 1, widthFromLeft);
-        AnchorCoordinate rowExtent = calculateRowExtent(sheet, slot.row1() - 1, slot.row2() - 1, heightFromTop);
+        long horizontalEnd = Math.min(slotWidthEmu, Math.max(horizontalStart + scaledWidth, horizontalStart + 1));
+        long verticalEnd = Math.min(slotHeightEmu, Math.max(verticalStart + scaledHeight, verticalStart + 1));
 
-        anchor.setDx1((int) Math.min(marginEmu, Integer.MAX_VALUE));
-        anchor.setDy1((int) Math.min(marginEmu, Integer.MAX_VALUE));
-        anchor.setCol2(columnExtent.index());
-        anchor.setDx2(columnExtent.offset());
-        anchor.setRow2(rowExtent.index());
-        anchor.setDy2(rowExtent.offset());
+        AnchorCoordinate columnStart = resolveColumnCoordinate(sheet, slot.col1() - 1, slot.col2() - 1, horizontalStart);
+        AnchorCoordinate columnEnd = resolveColumnCoordinate(sheet, slot.col1() - 1, slot.col2() - 1, horizontalEnd);
+        AnchorCoordinate rowStart = resolveRowCoordinate(sheet, slot.row1() - 1, slot.row2() - 1, verticalStart);
+        AnchorCoordinate rowEnd = resolveRowCoordinate(sheet, slot.row1() - 1, slot.row2() - 1, verticalEnd);
+
+        anchor.setCol1(columnStart.index());
+        anchor.setDx1(columnStart.offset());
+        anchor.setCol2(columnEnd.index());
+        anchor.setDx2(columnEnd.offset());
+        anchor.setRow1(rowStart.index());
+        anchor.setDy1(rowStart.offset());
+        anchor.setRow2(rowEnd.index());
+        anchor.setDy2(rowEnd.offset());
     }
 
     private long calculateSlotWidthEmu(XSSFSheet sheet, PhotoSlotTemplate slot) {
@@ -391,36 +457,30 @@ public class InspectionRecordExcelExporter {
         return height;
     }
 
-    private AnchorCoordinate calculateColumnExtent(Sheet sheet, int startColumn, int endColumn, long widthEmu) {
+    private AnchorCoordinate resolveColumnCoordinate(Sheet sheet, int startColumn, int endColumn, long offsetEmu) {
+        long clamped = Math.max(0, offsetEmu);
         long consumed = 0;
         for (int column = startColumn; column <= endColumn; column++) {
             long columnWidth = columnWidthInEmu(sheet, column);
             long next = consumed + columnWidth;
-            if (next >= widthEmu) {
-                long offset = Math.max(0, widthEmu - consumed);
-                if (offset == 0 && column > startColumn) {
-                    long previousWidth = columnWidthInEmu(sheet, column - 1);
-                    return new AnchorCoordinate(column - 1, (int) Math.min(previousWidth, Integer.MAX_VALUE));
-                }
-                return new AnchorCoordinate(column, (int) Math.min(offset, Integer.MAX_VALUE));
+            if (clamped < next || column == endColumn) {
+                long position = Math.min(Math.max(0, clamped - consumed), columnWidth);
+                return new AnchorCoordinate(column, (int) Math.min(position, Integer.MAX_VALUE));
             }
             consumed = next;
         }
         return new AnchorCoordinate(endColumn, 0);
     }
 
-    private AnchorCoordinate calculateRowExtent(Sheet sheet, int startRow, int endRow, long heightEmu) {
+    private AnchorCoordinate resolveRowCoordinate(Sheet sheet, int startRow, int endRow, long offsetEmu) {
+        long clamped = Math.max(0, offsetEmu);
         long consumed = 0;
         for (int rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
             long rowHeight = rowHeightInEmu(sheet, rowIndex);
             long next = consumed + rowHeight;
-            if (next >= heightEmu) {
-                long offset = Math.max(0, heightEmu - consumed);
-                if (offset == 0 && rowIndex > startRow) {
-                    long previousHeight = rowHeightInEmu(sheet, rowIndex - 1);
-                    return new AnchorCoordinate(rowIndex - 1, (int) Math.min(previousHeight, Integer.MAX_VALUE));
-                }
-                return new AnchorCoordinate(rowIndex, (int) Math.min(offset, Integer.MAX_VALUE));
+            if (clamped < next || rowIndex == endRow) {
+                long position = Math.min(Math.max(0, clamped - consumed), rowHeight);
+                return new AnchorCoordinate(rowIndex, (int) Math.min(position, Integer.MAX_VALUE));
             }
             consumed = next;
         }
