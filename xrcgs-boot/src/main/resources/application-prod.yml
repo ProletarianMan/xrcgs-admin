@@ -8,6 +8,15 @@ spring:
       minimum-idle: 1
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+    road-safety:
+      url: jdbc:mysql://localhost:3306/xrcgs_roadSafety?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      username: ${DB_ROAD_SAFETY_USER:${DB_USER}}
+      password: ${DB_ROAD_SAFETY_PASS:${DB_PASS}}
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      hikari:
+        maximum-pool-size: 5
+        minimum-idle: 1
+
   data:
     redis:
       host: localhost
