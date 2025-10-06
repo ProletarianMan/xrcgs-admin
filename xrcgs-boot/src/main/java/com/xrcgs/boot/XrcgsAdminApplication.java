@@ -10,8 +10,10 @@ import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGe
 @ConfigurationPropertiesScan(basePackages = "com.xrcgs") // 关键：让 @ConfigurationProperties 生效
 @MapperScan(
         basePackages = {
-                "com.xrcgs.*.mapper",   // 你原有 IAM 模块的 mapper
-                "com.xrcgs.auth.user"     // 新增 auth 模块里的 SysUserMapper 包
+                "com.xrcgs.iam.mapper",
+                "com.xrcgs.syslog.mapper",
+                "com.xrcgs.file.mapper",
+                "com.xrcgs.auth.user"
         },
         nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class
 )
