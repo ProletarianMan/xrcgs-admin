@@ -10,23 +10,24 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.nio.file.Paths;
-import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.core.io.FileSystemResource;
@@ -45,7 +46,7 @@ class InspectionRecordExcelExporterTest {
 
     @Test
     void shouldExportInspectionRecordWithPhotosAndHandlingDetails() throws Exception {
-        Path template = createTemplateWorkbook(tempDir.resolve("excel/inspectionRecord.xlsx"));
+        Path template = Paths.get("src/test/resources/excel/inspection_record.xlsx");
         InspectionRecordExcelExporter exporter = new InspectionRecordExcelExporter(new FileSystemResource(template));
         Path photoDir = Files.createDirectories(tempDir.resolve("photos"));
         List<PhotoItem> photos = new ArrayList<>();
@@ -56,23 +57,31 @@ class InspectionRecordExcelExporterTest {
 
         HandlingCategoryGroup categoryGroup = HandlingCategoryGroup.builder()
                 .roadDamage(List.of("路面沉陷处设置警示标志。"))
+                .trafficAccidents(List.of("收费站出口追尾事故处理完毕。"))
                 .roadRescue(List.of("拖移故障车辆1辆。"))
+                .facilityCompensations(Collections.emptyList())
                 .largeVehicleChecks(List.of("检查大件运输车辆2辆，手续齐全。"))
                 .overloadVehicleHandling(List.of("劝返超限车辆1辆。"))
+                .constructionChecks(Collections.emptyList())
+                .illegalInfringements(Collections.emptyList())
                 .otherMatters(List.of("与交警联合巡查。"))
                 .build();
 
         InspectionRecord record = InspectionRecord.builder()
                 .id(1L)
                 .date(LocalDate.of(2024, 12, 1))
+                .unitName("乌鲁木齐葛洲坝电建路桥绕城高速公路有限公司")
                 .weather("晴")
                 .patrolTeam("巡查一队")
+                .patrolVehicle("巡逻车A123")
                 .location("K10+000-K20+000")
                 .inspectionContent("路面、桥涵专项巡查。")
                 .issuesFound("发现1处沉陷。")
                 .handlingSituationRaw("现场设置警戒并安排抢修。")
                 .handlingDetails(categoryGroup)
+                .handoverSummary("交接巡查车辆与装备完毕。")
                 .photos(photos)
+                .remark("现场秩序良好。")
                 .createdBy("张三")
                 .createdAt(LocalDateTime.of(2024, 12, 1, 9, 30))
                 .updatedAt(LocalDateTime.of(2024, 12, 1, 18, 0))
@@ -81,52 +90,103 @@ class InspectionRecordExcelExporterTest {
                 .exportFileName("record.xlsx")
                 .build();
 
-        Path exportDir = Files.createDirectories(Paths.get("src/test/resources/export"));
-        Path output = exportDir.resolve("record.xlsx");
-        Files.deleteIfExists(output);
+        Path exportDir = Paths.get("src/test/resources/export");
+        Files.createDirectories(exportDir);
+        Path expectedOutput = exportDir.resolve("record.xlsx");
+        Files.deleteIfExists(expectedOutput);
 
-        output = exporter.export(record, exportDir);
+        Path output = exporter.export(record, exportDir);
         log.info("巡查记录导出文件路径: {}", output.toAbsolutePath());
+        assertThat(output).isEqualTo(expectedOutput);
         assertThat(Files.exists(output)).isTrue();
+        assertThat(output.getFileName().toString()).isEqualTo("record.xlsx");
 
         try (InputStream inputStream = Files.newInputStream(output);
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
+             XSSFWorkbook workbook = new XSSFWorkbook(inputStream)) {
+            XSSFSheet infoSheet = workbook.getSheetAt(0);
 
-            String dateText = readValueRightOfLabel(sheet, "巡查时间");
-            assertThat(dateText).contains("2024年12月01日");
+            assertThat(infoSheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("巡查记录表");
+            assertThat(infoSheet.getRow(1).getCell(0).getStringCellValue())
+                    .isEqualTo("单位：" + record.getUnitName());
 
-            Row dateRow = sheet.getRow(2);
-            assertThat(dateRow.getCell(1).getStringCellValue()).isEqualTo("：");
-            Cell targetCell = findTargetCell(sheet, "巡查时间");
-            assertThat(targetCell).isNotNull();
-            assertThat(targetCell.getColumnIndex()).isEqualTo(2);
-            assertThat(targetCell.getStringCellValue()).contains("2024年12月01日");
-            assertThat(targetCell.getCellStyle().getBorderBottom()).isEqualTo(BorderStyle.THIN);
+            assertThat(readValueRightOfLabel(infoSheet, "巡查时间")).contains("2024年12月01日");
+            assertThat(readValueRightOfLabel(infoSheet, "天气情况")).isEqualTo("晴");
+            assertThat(readValueRightOfLabel(infoSheet, "巡查人员")).isEqualTo("巡查一队");
+            assertThat(readValueRightOfLabel(infoSheet, "巡查车辆")).isEqualTo("巡逻车A123");
+            assertThat(readValueRightOfLabel(infoSheet, "巡查车辆、装备、案件等交接情况")).isEqualTo("交接巡查车辆与装备完毕。");
 
-            String handlingText = readValueRightOfLabel(sheet, "巡查、处理情况");
-            assertThat(handlingText)
-                    .contains("一、道路病害或损坏情况")
-                    .contains("路面沉陷处设置警示标志")
-                    .contains("二、交通事故或清障救援情况")
+            String handlingText = readValueRightOfLabel(infoSheet, "巡查、处理情况");
+            String normalizedHandling = handlingText.replace("\r\n", "\n");
+            assertThat(normalizedHandling)
+                    .contains("巡查内容：路面、桥涵专项巡查。")
+                    .contains("问题描述：发现1处沉陷。")
+                    .contains("处理情况（原始记录）：现场设置警戒并安排抢修。")
+                    .contains("一、道路病害或损坏情况：")
+                    .contains("- 路面沉陷处设置警示标志。")
+                    .contains("二、交通事故或清障救援情况：")
+                    .contains("（交通事故）")
+                    .contains("- 收费站出口追尾事故处理完毕。")
                     .contains("（清障救援）")
-                    .contains("拖移故障车辆1辆")
-                    .contains("七、其他情况");
+                    .contains("- 拖移故障车辆1辆。")
+                    .contains("三、设施赔补偿情况：\n无")
+                    .contains("七、其他情况：")
+                    .contains("- 与交警联合巡查。");
 
-            String remarkText = readValueRightOfLabel(sheet, "备注");
-            assertThat(remarkText).contains("创建：张三 (2024年12月01日 09:30)");
-            assertThat(remarkText).contains("导出：李四 (2024年12月01日 18:30)");
+            String remarkText = readValueRightOfLabel(infoSheet, "备注").replace("\r\n", "\n");
+            assertThat(remarkText)
+                    .contains("现场秩序良好。")
+                    .contains("创建：张三 (2024年12月01日 09:30)")
+                    .contains("最后更新时间：2024年12月01日 18:00")
+                    .contains("导出：李四 (2024年12月01日 18:30)");
 
-            boolean foundFifthDescription = false;
-            for (Row row : sheet) {
-                Cell cell = row.getCell(1);
-                if (cell != null && "第5张照片".equals(cell.getStringCellValue())) {
-                    assertThat(row.getRowNum()).isGreaterThanOrEqualTo(114);
-                    foundFifthDescription = true;
-                    break;
+            boolean auditFound = false;
+            for (Row row : infoSheet) {
+                if (row instanceof XSSFRow xssfRow && xssfRow.getZeroHeight()) {
+                    Cell keyCell = row.getCell(0);
+                    if (keyCell != null && "createdBy".equals(keyCell.getStringCellValue())) {
+                        XSSFRow valueRow = (XSSFRow) infoSheet.getRow(row.getRowNum() + 1);
+                        assertThat((Object) valueRow).isNotNull();
+                        assertThat(valueRow.getCell(0).getStringCellValue()).isEqualTo("张三");
+                        assertThat(valueRow.getCell(1).getStringCellValue()).contains("2024年12月01日 09:30");
+                        assertThat(valueRow.getCell(4).getStringCellValue()).contains("2024年12月01日 18:30");
+                        auditFound = true;
+                        break;
+                    }
                 }
             }
-            assertThat(foundFifthDescription).isTrue();
+            assertThat(auditFound).isTrue();
+
+            int expectedPhotoSheets = (int) Math.ceil(photos.size() / 2.0);
+            assertThat(workbook.getSheet("Sheet2")).isNull();
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(1 + expectedPhotoSheets);
+
+            for (int page = 1; page <= expectedPhotoSheets; page++) {
+                XSSFSheet photoSheet = workbook.getSheet("照片页" + page);
+                assertThat(photoSheet).isNotNull();
+
+                XSSFDrawing drawing = (XSSFDrawing) photoSheet.getDrawingPatriarch();
+                assertThat(drawing).isNotNull();
+                long pictureCount = drawing.getShapes().stream().filter(XSSFPicture.class::isInstance).count();
+                int startIndex = (page - 1) * 2;
+                int expectedPictures = Math.min(2, Math.max(0, photos.size() - startIndex));
+                assertThat(pictureCount).isEqualTo(expectedPictures);
+
+                Row topDescRow = photoSheet.getRow(26);
+                if (startIndex < photos.size()) {
+                    assertThat(topDescRow).isNotNull();
+                    assertThat(topDescRow.getCell(0).getStringCellValue())
+                            .isEqualTo("第" + (startIndex + 1) + "张照片");
+                }
+                Row bottomDescRow = photoSheet.getRow(51);
+                if (startIndex + 1 < photos.size()) {
+                    assertThat(bottomDescRow).isNotNull();
+                    assertThat(bottomDescRow.getCell(0).getStringCellValue())
+                            .isEqualTo("第" + (startIndex + 2) + "张照片");
+                } else {
+                    Cell bottomCell = bottomDescRow == null ? null : bottomDescRow.getCell(0);
+                    assertThat(bottomCell == null ? "" : bottomCell.getStringCellValue()).isEmpty();
+                }
+            }
         }
     }
 
@@ -140,64 +200,6 @@ class InspectionRecordExcelExporterTest {
         graphics.dispose();
         javax.imageio.ImageIO.write(image, "jpg", path.toFile());
         return path;
-    }
-
-    /**
-     * 构造一个满足导出逻辑的最小化模板，避免在仓库中提交真实业务模板。
-     */
-    private Path createTemplateWorkbook(Path path) throws IOException {
-        Files.createDirectories(path.getParent());
-        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet("模板");
-            for (int i = 0; i <= 150; i++) {
-                sheet.createRow(i);
-            }
-
-            createLabeledRow(sheet, 2, "巡查时间");
-            createLabeledRow(sheet, 3, "天气情况");
-            createLabeledRow(sheet, 4, "巡查人员");
-            createLabeledRow(sheet, 5, "巡查里程");
-            createLabeledRow(sheet, 6, "巡查路段");
-
-            sheet.getRow(7).createCell(0).setCellValue("巡查、处理情况");
-            addColonCell(sheet, 7, 1);
-            createMergedInputCell(sheet, 7, 2, 9, BorderStyle.THIN);
-
-            sheet.getRow(11).createCell(0).setCellValue("备注");
-            addColonCell(sheet, 11, 1);
-            createMergedInputCell(sheet, 11, 2, 5, BorderStyle.THIN);
-
-            try (OutputStream outputStream = Files.newOutputStream(path)) {
-                workbook.write(outputStream);
-            }
-        }
-        return path;
-    }
-
-    private void createLabeledRow(Sheet sheet, int rowIndex, String label) {
-        sheet.getRow(rowIndex).createCell(0).setCellValue(label);
-        addColonCell(sheet, rowIndex, 1);
-        createMergedInputCell(sheet, rowIndex, 2, 4, BorderStyle.THIN);
-    }
-
-    private void addColonCell(Sheet sheet, int rowIndex, int columnIndex) {
-        sheet.getRow(rowIndex).createCell(columnIndex).setCellValue("：");
-    }
-
-    private void createMergedInputCell(Sheet sheet, int rowIndex, int startColumn, int columnSpan, BorderStyle border) {
-        Row row = sheet.getRow(rowIndex);
-        for (int i = 0; i < columnSpan; i++) {
-            row.createCell(startColumn + i);
-        }
-        sheet.addMergedRegion(new CellRangeAddress(rowIndex, rowIndex, startColumn, startColumn + columnSpan - 1));
-        var workbook = sheet.getWorkbook();
-        var style = workbook.createCellStyle();
-        style.setBorderBottom(border);
-        style.setBorderTop(border);
-        style.setBorderLeft(border);
-        style.setBorderRight(border);
-        style.setWrapText(true);
-        row.getCell(startColumn).setCellStyle(style);
     }
 
     private String readValueRightOfLabel(Sheet sheet, String label) {
@@ -217,16 +219,23 @@ class InspectionRecordExcelExporterTest {
         int labelColumn = labelCell.getColumnIndex();
         CellRangeAddress nearest = null;
         for (CellRangeAddress region : sheet.getMergedRegions()) {
-            if (region.getFirstRow() == labelCell.getRowIndex()
-                    && region.getLastRow() == labelCell.getRowIndex()
-                    && region.getFirstColumn() > labelColumn) {
+            if (region.getFirstColumn() > labelColumn
+                    && region.getFirstRow() <= labelCell.getRowIndex()
+                    && region.getLastRow() >= labelCell.getRowIndex()) {
                 if (nearest == null || region.getFirstColumn() < nearest.getFirstColumn()) {
                     nearest = region;
                 }
             }
         }
         if (nearest != null) {
-            return row.getCell(nearest.getFirstColumn());
+            Row targetRow = sheet.getRow(nearest.getFirstRow());
+            if (targetRow == null) {
+                targetRow = sheet.createRow(nearest.getFirstRow());
+            }
+            Cell mergedCell = targetRow.getCell(nearest.getFirstColumn());
+            if (mergedCell != null) {
+                return mergedCell;
+            }
         }
         short lastCellNum = row.getLastCellNum();
         if (lastCellNum < 0) {
@@ -237,19 +246,12 @@ class InspectionRecordExcelExporterTest {
             if (candidate == null) {
                 continue;
             }
-            if (candidate.getCellType() == CellType.STRING) {
-                String text = candidate.getStringCellValue();
-                if (text != null && text.contains("：")) {
-                    continue;
-                }
-                if (text == null || text.isBlank()) {
-                    return candidate;
-                }
-            } else {
-                return candidate;
+            if (isLabelLikeCell(candidate)) {
+                continue;
             }
+            return candidate;
         }
-        return row.getCell(labelColumn + 1);
+        return row.getCell(labelColumn + 1, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
     }
 
     private Cell findLabelCell(Sheet sheet, String label) {
@@ -261,5 +263,17 @@ class InspectionRecordExcelExporterTest {
             }
         }
         return null;
+    }
+
+    private boolean isLabelLikeCell(Cell cell) {
+        if (cell.getCellType() != CellType.STRING) {
+            return false;
+        }
+        String text = cell.getStringCellValue();
+        if (text == null) {
+            return false;
+        }
+        String trimmed = text.trim();
+        return trimmed.endsWith("：") && !trimmed.contains("\n") && !trimmed.contains("\r");
     }
 }
