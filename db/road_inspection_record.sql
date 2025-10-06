@@ -29,6 +29,7 @@ CREATE TABLE `road_inspection_record` (
   `exported_by` VARCHAR(64) DEFAULT NULL COMMENT '导出人',
   `exported_at` DATETIME(6) DEFAULT NULL COMMENT '导出时间',
   `export_file_name` VARCHAR(255) DEFAULT NULL COMMENT '导出文件名',
+  `approval_status` VARCHAR(32) NOT NULL DEFAULT 'UNSUBMITTED' COMMENT '审批状态',
   `squad_code` VARCHAR(64) NOT NULL COMMENT '所属中队编码',
   PRIMARY KEY (`id`),
   KEY `idx_record_date` (`record_date`),
