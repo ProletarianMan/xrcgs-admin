@@ -1,5 +1,6 @@
 package com.xrcgs.roadsafety.inspection.domain.model;
 
+import com.xrcgs.common.enums.ApprovalStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -87,6 +88,12 @@ public class InspectionRecord {
      * 备注。
      */
     private String remark;
+
+    /**
+     * 巡查日志的审批状态。
+     */
+    @Builder.Default
+    private ApprovalStatus approvalStatus = ApprovalStatus.UNSUBMITTED;
 
     private String createdBy;
     private LocalDateTime createdAt;
