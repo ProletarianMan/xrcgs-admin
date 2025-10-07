@@ -38,6 +38,6 @@ syslog:
 logging:
   level:
     com.xrcgs.syslog.mapper: error
-
+    
 road-safety:
   inspection-log: data/inspection-logs
