@@ -38,3 +38,7 @@ syslog:
 logging:
   level:
     com.xrcgs.syslog.mapper: error
+
+# 路产安全文件目录
+road-safety:
+  inspection-log: ""

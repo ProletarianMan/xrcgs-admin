@@ -56,3 +56,7 @@ convert:
 # LibreOffice 安装路径（如放空则按系统默认）
 libreoffice:
   home: ""    # Linux: /opt/libreoffice7.6 ；Windows: C:\Program Files\LibreOffice\program\soffice.exe 的上级目录
+
+# 路产安全文件目录
+road-safety:
+  inspection-log: ""
