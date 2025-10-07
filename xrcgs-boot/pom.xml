@@ -61,6 +61,12 @@
             <artifactId>xrcgs-module-file</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.xrcgs</groupId>
+            <artifactId>xrcgs-module-road-safety</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>
