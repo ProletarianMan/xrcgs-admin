@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.*;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -29,7 +30,11 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         // 支持 {bcrypt},{noop},{pbkdf2},{scrypt},{argon2} 等前缀
-        return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        DelegatingPasswordEncoder encoder =
+                (DelegatingPasswordEncoder) PasswordEncoderFactories.createDelegatingPasswordEncoder();
+        // 兼容历史数据：数据库中若存储无 {id} 前缀的 BCrypt 哈希，则默认按 BCrypt 校验
+        encoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
+        return encoder;
     }
 
     @Bean

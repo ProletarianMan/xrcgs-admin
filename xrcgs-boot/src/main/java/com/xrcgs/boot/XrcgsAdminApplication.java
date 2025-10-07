@@ -15,6 +15,7 @@ import org.springframework.context.annotation.FullyQualifiedAnnotationBeanNameGe
                 "com.xrcgs.file.mapper",
                 "com.xrcgs.auth.user"
         },
+        sqlSessionFactoryRef = "sqlSessionFactory",
         nameGenerator = FullyQualifiedAnnotationBeanNameGenerator.class
 )
 public class XrcgsAdminApplication {
