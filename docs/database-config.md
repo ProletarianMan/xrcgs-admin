@@ -7,8 +7,9 @@
 1. `RoadSafetyDataSourceConfig` 会在配置文件存在 `spring.datasource.road-safety.url` 时生效（`@ConditionalOnProperty`）。它手动声明了路产安全库的 `DataSource`、`SqlSessionFactory`、`SqlSessionTemplate` 与 `DataSourceTransactionManager`。这样一来，该模板绑定在独立的连接池 `roadSafetyDataSource` 上。 【F:xrcgs-infrastructure/src/main/java/com/xrcgs/infrastructure/config/RoadSafetyDataSourceConfig.java†L31-L89】
 2. 路产安全模块在检测到独立模板存在时，会通过 `RoadSafetyMapperConfiguration` 把 Mapper 绑定到 `roadSafetySqlSessionTemplate` 上，从而连到路产安全库。 【F:xrcgs-module-road-safety/src/main/java/com/xrcgs/roadsafety/config/RoadSafetyMapperConfiguration.java†L10-L18】
 3. 如果未提供独立模板，`RoadSafetyMapperFallbackConfiguration` 会让同一批 Mapper 回退到 Spring Boot 默认的主库模板，因此它们会落到 `xrcgs_admin` 数据库。 【F:xrcgs-module-road-safety/src/main/java/com/xrcgs/roadsafety/config/RoadSafetyMapperFallbackConfiguration.java†L10-L17】
-4. 主工程的 `@MapperScan` 范围排除了路产安全包，只覆盖 IAM、日志、文件、认证等模块，它们继续使用默认数据源。 【F:xrcgs-boot/src/main/java/com/xrcgs/boot/XrcgsAdminApplication.java†L10-L19】
-5. 多数据源的连接串、账号等配置在 `application-*.yml` 中按模块拆分：`spring.datasource.*` 对应主库，`spring.datasource.road-safety.*` 则供路产安全库使用。通过属性占位符 `${DB_ROAD_SAFETY_USER:${DB_USER:root}}` 等方式，支持按需覆盖或回退默认值。 【F:xrcgs-boot/src/main/resources/application-dev.yml†L1-L21】【F:xrcgs-boot/src/main/resources/application-prod.yml†L1-L21】
+4. 主工程的 `@MapperScan` 范围排除了路产安全包，只覆盖 IAM、日志、文件、认证等模块，并且显式绑定到默认的 `sqlSessionFactory`，从而始终走主库连接。 【F:xrcgs-boot/src/main/java/com/xrcgs/boot/XrcgsAdminApplication.java†L10-L21】
+5. 若 MyBatis-Plus 未能自动装配名为 `sqlSessionFactory` 的 Bean，`PrimaryMybatisFallbackConfig` 会以主数据源参数补齐一份兜底配置，确保上述扫描配置可以顺利注入并连到 `xrcgs_admin`。 【F:xrcgs-infrastructure/src/main/java/com/xrcgs/infrastructure/config/PrimaryMybatisFallbackConfig.java†L1-L86】
+6. 多数据源的连接串、账号等配置在 `application-*.yml` 中按模块拆分：`spring.datasource.*` 对应主库，`spring.datasource.road-safety.*` 则供路产安全库使用。通过属性占位符 `${DB_ROAD_SAFETY_USER:${DB_USER:root}}` 等方式，支持按需覆盖或回退默认值。 【F:xrcgs-boot/src/main/resources/application-dev.yml†L1-L21】【F:xrcgs-boot/src/main/resources/application-prod.yml†L1-L21】
 
 ### 让路产安全模块回退到主库 `xrcgs_admin`
 
