@@ -70,6 +70,9 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         }
         String traceId = Optional.ofNullable(MDC.get("traceId")).orElse("-");
         Long operatorId = userIdProvider.getCurrentUserId();
+        if (operatorId == null) {
+            throw new IllegalStateException("无法获取当前登录用户信息");
+        }
         Long operatorDeptId = resolveDeptId(operatorId);
         List<FileVO> result = new ArrayList<>();
         for (MultipartFile f : files) {
@@ -128,9 +131,6 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             ent.setSha256(saved.getSha256());
             ent.setStoragePath(saved.getStorageRelativePath());
             ent.setStatus(FileStatus.UPLOADED.name());
-            if (operatorId != null) {
-                ent.setCreatedBy(operatorId);
-            }
             ent.setDeptId(operatorDeptId);
 
 

@@ -2,6 +2,8 @@ package com.xrcgs.infrastructure.config;
 
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusProperties;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.config.GlobalConfig;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import com.zaxxer.hikari.HikariDataSource;
@@ -28,11 +30,14 @@ import javax.sql.DataSource;
 public class PrimaryDataSourceConfig {
 
     private final ObjectProvider<MybatisPlusInterceptor> interceptorProvider;
+    private final ObjectProvider<MetaObjectHandler> metaObjectHandlerProvider;
     private final MybatisPlusProperties mybatisPlusProperties;
 
     public PrimaryDataSourceConfig(ObjectProvider<MybatisPlusInterceptor> interceptorProvider,
+                                   ObjectProvider<MetaObjectHandler> metaObjectHandlerProvider,
                                    MybatisPlusProperties mybatisPlusProperties) {
         this.interceptorProvider = interceptorProvider;
+        this.metaObjectHandlerProvider = metaObjectHandlerProvider;
         this.mybatisPlusProperties = mybatisPlusProperties;
     }
 
@@ -70,8 +75,9 @@ public class PrimaryDataSourceConfig {
         }
         factory.setConfiguration(configuration);
 
-        if (mybatisPlusProperties.getGlobalConfig() != null) {
-            factory.setGlobalConfig(mybatisPlusProperties.getGlobalConfig());
+        var globalConfig = resolveGlobalConfig();
+        if (globalConfig != null) {
+            factory.setGlobalConfig(globalConfig);
         }
         if (StringUtils.hasText(mybatisPlusProperties.getTypeAliasesPackage())) {
             factory.setTypeAliasesPackage(mybatisPlusProperties.getTypeAliasesPackage());
@@ -102,5 +108,19 @@ public class PrimaryDataSourceConfig {
     @Primary
     public DataSourceTransactionManager primaryTransactionManager(@Qualifier("dataSource") DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
+    }
+
+    private GlobalConfig resolveGlobalConfig() {
+        GlobalConfig config = mybatisPlusProperties.getGlobalConfig();
+        if (config == null) {
+            config = new GlobalConfig();
+        }
+        if (config.getMetaObjectHandler() == null) {
+            MetaObjectHandler handler = metaObjectHandlerProvider.getIfAvailable();
+            if (handler != null) {
+                config.setMetaObjectHandler(handler);
+            }
+        }
+        return config;
     }
 }
