@@ -1,5 +1,6 @@
 package com.xrcgs.roadsafety.inspection.application.service;
 
+import com.xrcgs.roadsafety.inspection.config.InspectionLogProperties;
 import com.xrcgs.roadsafety.inspection.domain.model.HandlingCategoryGroup;
 import com.xrcgs.roadsafety.inspection.domain.model.InspectionRecord;
 import com.xrcgs.roadsafety.inspection.domain.model.PhotoItem;
@@ -9,9 +10,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.InvalidPathException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,7 +41,9 @@ import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -71,14 +74,21 @@ public class InspectionRecordExcelExporter {
     );
 
     // 注入模板资源，便于在不同运行环境或测试中覆盖默认模板。
-    private final Resource templateResource;
+    private final Resource templateResourceOverride;
+    private final InspectionLogProperties logProperties;
 
-    public InspectionRecordExcelExporter() {
-        this(new ClassPathResource(TEMPLATE_CLASSPATH));
+    @Autowired
+    public InspectionRecordExcelExporter(InspectionLogProperties logProperties) {
+        this(logProperties, null);
     }
 
     InspectionRecordExcelExporter(Resource templateResource) {
-        this.templateResource = templateResource;
+        this(null, templateResource);
+    }
+
+    private InspectionRecordExcelExporter(InspectionLogProperties logProperties, Resource templateResourceOverride) {
+        this.logProperties = logProperties;
+        this.templateResourceOverride = templateResourceOverride;
     }
 
     /**
@@ -123,10 +133,34 @@ public class InspectionRecordExcelExporter {
     }
 
     private InputStream openTemplate() throws IOException {
-        if (!templateResource.exists()) {
-            throw new IOException("巡查记录模板不存在: " + templateResource.getDescription());
+        Resource resource = resolveTemplateResource();
+        if (!resource.exists()) {
+            throw new IOException("巡查记录模板不存在: " + resource.getDescription());
         }
-        return templateResource.getInputStream();
+        return resource.getInputStream();
+    }
+
+    private Resource resolveTemplateResource() throws IOException {
+        if (templateResourceOverride != null) {
+            return templateResourceOverride;
+        }
+        String configuredTemplate = Optional.ofNullable(logProperties)
+                .map(InspectionLogProperties::getLogTemplate)
+                .map(String::trim)
+                .orElse("");
+        if (StringUtils.hasText(configuredTemplate)) {
+            try {
+                Path templatePath = Paths.get(configuredTemplate).toAbsolutePath().normalize();
+                Resource fileResource = new FileSystemResource(templatePath);
+                if (!fileResource.exists()) {
+                    throw new IOException("巡查记录模板不存在: " + templatePath);
+                }
+                return fileResource;
+            } catch (InvalidPathException ex) {
+                throw new IOException("巡查记录模板路径非法: " + configuredTemplate, ex);
+            }
+        }
+        return new ClassPathResource(TEMPLATE_CLASSPATH);
     }
 
     private void fillHeaderInfo(XSSFSheet sheet, InspectionRecord record) {
