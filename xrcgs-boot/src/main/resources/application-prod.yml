@@ -41,3 +41,4 @@ logging:
     
 road-safety:
   inspection-log: data/inspection-logs
+  log-template: ""
