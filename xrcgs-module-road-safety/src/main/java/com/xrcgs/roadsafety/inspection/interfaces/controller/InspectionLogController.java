@@ -2,6 +2,7 @@ package com.xrcgs.roadsafety.inspection.interfaces.controller;
 
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogApplicationService;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitRequest;
+import com.xrcgs.syslog.annotation.OpLog;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -39,6 +40,7 @@ public class InspectionLogController {
      * @param response HTTP 响应对象
      */
     @PostMapping("/export")
+    @OpLog("生成巡查日志")
     public void export(@Valid @RequestBody InspectionLogSubmitRequest request,
                        HttpServletResponse response) throws IOException {
         Path exportFile = applicationService.generateInspectionLog(request);
