@@ -1,5 +1,6 @@
 package com.xrcgs.infrastructure.audit;
 
+import com.xrcgs.common.security.UserPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -24,18 +25,23 @@ public class SecurityOnlyUserIdProvider implements UserIdProvider {
 
         Object principal = auth.getPrincipal();
 
-        // 1) 如果你的自定义用户对象实现了 UserIdAware，直接拿 Long ID
+        // 1) JWT 过滤器会放入我们自己的 UserPrincipal，优先读取其中的 Long userId
+        if (principal instanceof UserPrincipal up) {
+            return up.getUserId();
+        }
+
+        // 2) 如果你的自定义用户对象实现了 UserIdAware，直接拿 Long ID
         if (principal instanceof UserIdAware aware) {
             return aware.getId();
         }
 
-        // 2) Spring 自带的 UserDetails：username 若是数字ID则可解析
+        // 3) Spring 自带的 UserDetails：username 若是数字ID则可解析
         if (principal instanceof UserDetails ud) {
             Long parsed = tryParseLong(ud.getUsername());
             if (parsed != null) return parsed;
         }
 
-        // 3) 兜底：auth.getName()（很多情况下是用户名；若是数字ID则解析成功）
+        // 4) 兜底：auth.getName()（很多情况下是用户名；若是数字ID则解析成功）
         return tryParseLong(auth.getName());
     }
 
