@@ -54,10 +54,8 @@ public class FileController {
     @PreAuthorize("isAuthenticated()")
     @OpLog("文件上传")
     public R<List<FileVO>> upload(@RequestParam("files") List<MultipartFile> files,
-                                  @RequestParam("bizType") @NotBlank String bizType,
-                                  @RequestHeader(name="X-User-Id", required = false) Long userIdHeader) {
-        Long userId = Optional.ofNullable(userIdHeader).orElse(null);
-        List<FileVO> list = fileService.upload(files, bizType, userId);
+                                  @RequestParam("bizType") @NotBlank String bizType) {
+        List<FileVO> list = fileService.upload(files, bizType);
         return R.ok(list);
     }
 
