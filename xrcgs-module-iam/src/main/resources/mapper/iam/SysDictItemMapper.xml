@@ -5,6 +5,7 @@
 
     <select id="selectByQuery" resultType="com.xrcgs.iam.entity.SysDictItem">
         SELECT id, type_code AS typeCode, label, value, sort, ext, status,
+        dept_id AS deptId,
         created_at AS createdAt, updated_at AS updatedAt
         FROM sys_dict_item
         WHERE 1 = 1
@@ -28,6 +29,7 @@
     <select id="selectPageByQuery" resultType="com.xrcgs.iam.entity.SysDictItem">
         SELECT
         id, type_code AS typeCode, label, value, ext, sort, status,
+        dept_id AS deptId,
         created_at AS createdAt, updated_at AS updatedAt
         FROM sys_dict_item
         WHERE 1 = 1

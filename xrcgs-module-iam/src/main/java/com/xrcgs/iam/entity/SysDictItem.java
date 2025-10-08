@@ -21,6 +21,8 @@ public class SysDictItem {
     private String ext;
     private Integer status; // 1启用 0禁用
 
+    private Long deptId; // 归属部门
+
     @JsonFormat(pattern = "yyy-MM-dd")
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
