@@ -18,4 +18,9 @@ public class InspectionLogProperties {
      * 巡查日志 Excel 文件在磁盘上的持久化目录（绝对路径或相对项目根路径）。
      */
     private String inspectionLog;
+
+    /**
+     * 巡查日志 Excel 模板文件路径（绝对路径或相对项目根路径）。
+     */
+    private String logTemplate;
 }
