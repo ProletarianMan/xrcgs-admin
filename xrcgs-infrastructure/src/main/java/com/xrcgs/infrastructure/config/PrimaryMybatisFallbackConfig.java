@@ -2,6 +2,8 @@ package com.xrcgs.infrastructure.config;
 
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusProperties;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.config.GlobalConfig;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -29,13 +31,16 @@ public class PrimaryMybatisFallbackConfig {
     private final DataSource dataSource;
     private final ObjectProvider<MybatisPlusInterceptor> interceptorProvider;
     private final ObjectProvider<MybatisPlusProperties> propertiesProvider;
+    private final ObjectProvider<MetaObjectHandler> metaObjectHandlerProvider;
 
     public PrimaryMybatisFallbackConfig(@Qualifier("dataSource") DataSource dataSource,
                                         ObjectProvider<MybatisPlusInterceptor> interceptorProvider,
-                                        ObjectProvider<MybatisPlusProperties> propertiesProvider) {
+                                        ObjectProvider<MybatisPlusProperties> propertiesProvider,
+                                        ObjectProvider<MetaObjectHandler> metaObjectHandlerProvider) {
         this.dataSource = dataSource;
         this.interceptorProvider = interceptorProvider;
         this.propertiesProvider = propertiesProvider;
+        this.metaObjectHandlerProvider = metaObjectHandlerProvider;
     }
 
     @Bean(name = "sqlSessionFactory")
@@ -59,8 +64,9 @@ public class PrimaryMybatisFallbackConfig {
         }
         factory.setConfiguration(configuration);
 
-        if (properties.getGlobalConfig() != null) {
-            factory.setGlobalConfig(properties.getGlobalConfig());
+        var globalConfig = resolveGlobalConfig(properties);
+        if (globalConfig != null) {
+            factory.setGlobalConfig(globalConfig);
         }
         if (StringUtils.hasText(properties.getTypeAliasesPackage())) {
             factory.setTypeAliasesPackage(properties.getTypeAliasesPackage());
@@ -85,5 +91,19 @@ public class PrimaryMybatisFallbackConfig {
     @ConditionalOnMissingBean
     public SqlSessionTemplate sqlSessionTemplate(@Qualifier("sqlSessionFactory") SqlSessionFactory sqlSessionFactory) {
         return new SqlSessionTemplate(sqlSessionFactory);
+    }
+
+    private GlobalConfig resolveGlobalConfig(MybatisPlusProperties properties) {
+        GlobalConfig config = properties.getGlobalConfig();
+        if (config == null) {
+            config = new GlobalConfig();
+        }
+        if (config.getMetaObjectHandler() == null) {
+            MetaObjectHandler handler = metaObjectHandlerProvider.getIfAvailable();
+            if (handler != null) {
+                config.setMetaObjectHandler(handler);
+            }
+        }
+        return config;
     }
 }

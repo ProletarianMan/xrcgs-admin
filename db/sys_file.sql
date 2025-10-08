@@ -11,11 +11,13 @@ CREATE TABLE `sys_file` (
   `preview_path` varchar(512) DEFAULT NULL COMMENT '转换/预览相对路径（data/preview/...）',
   `status` varchar(16) NOT NULL DEFAULT 'UPLOADED' COMMENT 'UPLOADED/CONVERTING/READY/FAIL/DELETED',
   `error_msg` varchar(1024) DEFAULT NULL COMMENT '错误信息（转换失败等）',
+  `dept_id` bigint DEFAULT NULL COMMENT '归属部门 ID',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `created_by` bigint DEFAULT NULL COMMENT '创建人（用户ID，若有）',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_sha256` (`sha256`),
   KEY `idx_biz_type` (`biz_type`),
   KEY `idx_file_type` (`file_type`),
-  KEY `idx_created_at` (`created_at`)
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_dept_id` (`dept_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统文件表';
