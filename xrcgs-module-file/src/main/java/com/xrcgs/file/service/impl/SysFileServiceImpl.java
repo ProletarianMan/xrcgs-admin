@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.datascope.DataScopeUtil;
 import com.xrcgs.iam.datascope.EffectiveDataScope;
+import com.xrcgs.iam.entity.SysUser;
+import com.xrcgs.iam.mapper.SysUserMapper;
 import com.xrcgs.file.config.FileProperties;
 import com.xrcgs.file.enums.FileStatus;
 import com.xrcgs.file.enums.FileType;
@@ -45,17 +47,17 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
     private final SysFileMapper mapper;
     private final DataScopeManager dataScopeManager;
     private final UserIdProvider userIdProvider;
+    private final SysUserMapper userMapper;
 
     /**
      * 文件上传
      * @param files 多文件本身
      * @param bizType 业务类型
-     * @param userId 用户Id
      * @return 文件属性
      */
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public List<FileVO> upload(List<MultipartFile> files, String bizType, Long userId) {
+    public List<FileVO> upload(List<MultipartFile> files, String bizType) {
         if (files == null || files.isEmpty()) {
             throw new IllegalArgumentException("没有上传文件");
         }
@@ -67,6 +69,8 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             }
         }
         String traceId = Optional.ofNullable(MDC.get("traceId")).orElse("-");
+        Long operatorId = userIdProvider.getCurrentUserId();
+        Long operatorDeptId = resolveDeptId(operatorId);
         List<FileVO> result = new ArrayList<>();
         for (MultipartFile f : files) {
             // 1) 先计算 sha256（不加载全量到内存）
@@ -78,10 +82,7 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             }
 
             // 2) 查是否已有（未删除）的记录
-            SysFile existed = this.getOne(new LambdaQueryWrapper<SysFile>()
-                    .eq(SysFile::getSha256, sha256)
-                    .ne(SysFile::getStatus, FileStatus.DELETED.name())
-                    .last("limit 1"));
+            SysFile existed = findReusableBySha(sha256);
 
             if (existed != null) {
                 // 2.1 已存在：不落盘，直接返回旧记录的属性
@@ -94,6 +95,24 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             FileStorage.SaveResult saved;
             try {
                 saved = storage.save(f, bizType);
+            } catch (java.nio.file.FileAlreadyExistsException faee) {
+                // 文件名冲突时，优先尝试复用数据库中已有的记录；如果只是磁盘残留的旧文件，则清理后重试保存
+                SysFile reuse = findReusableBySha(sha256);
+                if (reuse != null) {
+                    result.add(toVO(reuse, true));
+                    continue;
+                }
+                Path conflicted = safeResolveConflictPath(faee);
+                if (conflicted != null) {
+                    try {
+                        Files.deleteIfExists(conflicted);
+                        saved = storage.save(f, bizType);
+                    } catch (IOException ex2) {
+                        throw new RuntimeException("文件入库失败: " + f.getOriginalFilename(), ex2);
+                    }
+                } else {
+                    throw new RuntimeException("文件入库失败: " + f.getOriginalFilename(), faee);
+                }
             } catch (IOException e) {
                 throw new RuntimeException("文件入库失败: " + f.getOriginalFilename(), e);
             }
@@ -109,16 +128,17 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             ent.setSha256(saved.getSha256());
             ent.setStoragePath(saved.getStorageRelativePath());
             ent.setStatus(FileStatus.UPLOADED.name());
+            if (operatorId != null) {
+                ent.setCreatedBy(operatorId);
+            }
+            ent.setDeptId(operatorDeptId);
 
 
             try {
                 this.save(ent);
             } catch (DuplicateKeyException dke) {
                 // 3.1 并发场景：别的请求刚好插入了同 sha256；此时回查并复用
-                SysFile concurrent = this.getOne(new LambdaQueryWrapper<SysFile>()
-                        .eq(SysFile::getSha256, sha256)
-                        .ne(SysFile::getStatus, FileStatus.DELETED.name())
-                        .last("limit 1"));
+                SysFile concurrent = findReusableBySha(sha256);
 
                 if (concurrent != null) {
                     result.add(toVO(concurrent, true));
@@ -126,7 +146,11 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
                     continue;
                 }
                 // 抛出
+                deletePhysicalFileQuietly(saved);
                 throw dke;
+            } catch (Exception e) {
+                deletePhysicalFileQuietly(saved);
+                throw (e instanceof RuntimeException re) ? re : new RuntimeException("文件入库失败: " + f.getOriginalFilename(), e);
             }
 
             result.add(toVO(ent, false));
@@ -258,5 +282,65 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
                 .status(f.getStatus())
                 .reused(reused)
                 .build();
+    }
+
+    private SysFile findReusableBySha(String sha256) {
+        if (!StringUtils.hasText(sha256)) {
+            return null;
+        }
+        return this.getOne(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getSha256, sha256)
+                .ne(SysFile::getStatus, FileStatus.DELETED.name())
+                .last("limit 1"));
+    }
+
+    private Long resolveDeptId(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        try {
+            SysUser user = userMapper.selectById(userId);
+            if (user == null) {
+                log.warn("未找到用户，无法确定部门，userId={}", userId);
+                return null;
+            }
+            return user.getDeptId();
+        } catch (Exception ex) {
+            log.warn("查询用户部门失败 userId={} err={}", userId, cut(ex.getMessage(), 256));
+            return null;
+        }
+    }
+
+    private void deletePhysicalFileQuietly(FileStorage.SaveResult saved) {
+        if (saved == null) {
+            return;
+        }
+        Path path = saved.getAbsolutePath();
+        if (path == null && StringUtils.hasText(saved.getStorageRelativePath())) {
+            path = storage.resolveStorageAbsolute(saved.getStorageRelativePath());
+        }
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (Exception ex) {
+            log.warn("清理物理文件失败 path={} err={}", path, cut(ex.getMessage(), 256));
+        }
+    }
+
+    private Path safeResolveConflictPath(java.nio.file.FileAlreadyExistsException ex) {
+        if (ex == null) {
+            return null;
+        }
+        String file = ex.getFile();
+        if (!StringUtils.hasText(file)) {
+            return null;
+        }
+        try {
+            return Path.of(file);
+        } catch (Exception ignore) {
+            return null;
+        }
     }
 }

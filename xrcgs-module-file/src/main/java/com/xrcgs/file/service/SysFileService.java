@@ -16,7 +16,7 @@ import java.util.Map;
 public interface SysFileService extends IService<SysFile> {
 
     // 上传
-    List<FileVO> upload(List<MultipartFile> files, String bizType, Long userId);
+    List<FileVO> upload(List<MultipartFile> files, String bizType);
 
     // 通过Id获取文件
     SysFile getOneById(Long id);
