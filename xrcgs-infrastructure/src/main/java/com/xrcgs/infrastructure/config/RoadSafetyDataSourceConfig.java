@@ -1,6 +1,8 @@
 package com.xrcgs.infrastructure.config;
 
 import com.baomidou.mybatisplus.autoconfigure.MybatisPlusProperties;
+import com.baomidou.mybatisplus.core.config.GlobalConfig;
+import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import com.zaxxer.hikari.HikariDataSource;
@@ -33,11 +35,14 @@ public class RoadSafetyDataSourceConfig {
 
     private final MybatisPlusInterceptor mybatisPlusInterceptor;
     private final MybatisPlusProperties mybatisPlusProperties;
+    private final MetaObjectHandler metaObjectHandler;
 
     public RoadSafetyDataSourceConfig(MybatisPlusInterceptor mybatisPlusInterceptor,
-                                      MybatisPlusProperties mybatisPlusProperties) {
+                                      MybatisPlusProperties mybatisPlusProperties,
+                                      MetaObjectHandler metaObjectHandler) {
         this.mybatisPlusInterceptor = mybatisPlusInterceptor;
         this.mybatisPlusProperties = mybatisPlusProperties;
+        this.metaObjectHandler = metaObjectHandler;
     }
 
     @Bean
@@ -62,8 +67,9 @@ public class RoadSafetyDataSourceConfig {
         configuration.setMapUnderscoreToCamelCase(true);
         factory.setConfiguration(configuration);
 
-        if (mybatisPlusProperties.getGlobalConfig() != null) {
-            factory.setGlobalConfig(mybatisPlusProperties.getGlobalConfig());
+        var globalConfig = resolveGlobalConfig();
+        if (globalConfig != null) {
+            factory.setGlobalConfig(globalConfig);
         }
 
         if (StringUtils.hasText(mybatisPlusProperties.getTypeAliasesPackage())) {
@@ -101,5 +107,16 @@ public class RoadSafetyDataSourceConfig {
             resources.addAll(List.of(resolver.getResources(mapperLocation)));
         }
         return resources.toArray(new Resource[0]);
+    }
+
+    private GlobalConfig resolveGlobalConfig() {
+        GlobalConfig config = mybatisPlusProperties.getGlobalConfig();
+        if (config == null) {
+            config = new GlobalConfig();
+        }
+        if (config.getMetaObjectHandler() == null) {
+            config.setMetaObjectHandler(metaObjectHandler);
+        }
+        return config;
     }
 }
