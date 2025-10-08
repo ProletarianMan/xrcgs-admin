@@ -62,6 +62,8 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/api/ping", "/actuator/**").permitAll()
+                        // 文件模块的预览、下载接口需给巡查日志导出场景匿名访问，以便 Excel 写入时读取图片
+                        .requestMatchers("/api/file/preview/**", "/api/file/download/**").permitAll()
 //                        .requestMatchers("/api/**").permitAll()
                         .anyRequest().authenticated()
                 )

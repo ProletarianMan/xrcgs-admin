@@ -30,6 +30,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -43,6 +45,8 @@ import org.springframework.util.StringUtils;
 public class InspectionLogApplicationService {
 
     private static final DateTimeFormatter ISO_DATE = DateTimeFormatter.ISO_LOCAL_DATE;
+    // 兼容前端传入的 /api/file/preview/{id} 或 /api/file/download/{id} 相对路径，提取其中的文件主键
+    private static final Pattern FILE_ID_PATTERN = Pattern.compile("/api/file/(?:preview|download)/(\\d+)");
 
     private final InspectionRecordExcelExporter excelExporter;
     private final InspectionLogProperties logProperties;
@@ -347,7 +351,10 @@ public class InspectionLogApplicationService {
                                 .filter(StringUtils::hasText)
                                 .map(String::trim)
                                 .orElseGet(() -> defaultText(detail.getDescription()));
+                // 自动识别相对路径中的文件 ID，供后续导出环节换取真实存储路径
+                Long fileId = extractFileId(photoItem.getUrl());
                 photos.add(PhotoItem.builder()
+                        .fileId(fileId)
                         .imagePath(photoItem.getUrl().trim())
                         .description(description)
                         .sortOrder(order.getAndIncrement())
@@ -355,6 +362,21 @@ public class InspectionLogApplicationService {
             }
         }
         return photos;
+    }
+
+    private Long extractFileId(String url) {
+        if (!StringUtils.hasText(url)) {
+            return null;
+        }
+        Matcher matcher = FILE_ID_PATTERN.matcher(url.trim());
+        if (matcher.find()) {
+            try {
+                return Long.valueOf(matcher.group(1));
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private String buildDetailSummary(InspectionDetail detail) {

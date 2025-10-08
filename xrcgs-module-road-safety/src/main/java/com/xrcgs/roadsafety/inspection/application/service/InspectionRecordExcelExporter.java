@@ -1,14 +1,17 @@
 package com.xrcgs.roadsafety.inspection.application.service;
 
+import com.xrcgs.file.model.entity.SysFile;
+import com.xrcgs.file.service.SysFileService;
+import com.xrcgs.file.storage.FileStorage;
 import com.xrcgs.roadsafety.inspection.config.InspectionLogProperties;
 import com.xrcgs.roadsafety.inspection.domain.model.HandlingCategoryGroup;
 import com.xrcgs.roadsafety.inspection.domain.model.InspectionRecord;
 import com.xrcgs.roadsafety.inspection.domain.model.PhotoItem;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
@@ -76,18 +79,28 @@ public class InspectionRecordExcelExporter {
     // 注入模板资源，便于在不同运行环境或测试中覆盖默认模板。
     private final Resource templateResourceOverride;
     private final InspectionLogProperties logProperties;
+    // 通过文件服务与存储组件从文件主键读取真实文件内容
+    private final SysFileService sysFileService;
+    private final FileStorage fileStorage;
 
     @Autowired
-    public InspectionRecordExcelExporter(InspectionLogProperties logProperties) {
-        this(logProperties, null);
+    public InspectionRecordExcelExporter(InspectionLogProperties logProperties,
+                                        SysFileService sysFileService,
+                                        FileStorage fileStorage) {
+        this(logProperties, sysFileService, fileStorage, null);
     }
 
     InspectionRecordExcelExporter(Resource templateResource) {
-        this(null, templateResource);
+        this(null, null, null, templateResource);
     }
 
-    private InspectionRecordExcelExporter(InspectionLogProperties logProperties, Resource templateResourceOverride) {
+    private InspectionRecordExcelExporter(InspectionLogProperties logProperties,
+                                         SysFileService sysFileService,
+                                         FileStorage fileStorage,
+                                         Resource templateResourceOverride) {
         this.logProperties = logProperties;
+        this.sysFileService = sysFileService;
+        this.fileStorage = fileStorage;
         this.templateResourceOverride = templateResourceOverride;
     }
 
@@ -309,13 +322,17 @@ public class InspectionRecordExcelExporter {
                 }
 
                 PhotoItem photo = photos.get(photoIndex);
-                if (photo == null || !StringUtils.hasText(photo.getImagePath())) {
+                if (photo == null) {
+                    clearDescriptionCell(photoSheet, slot);
+                    continue;
+                }
+                if (!StringUtils.hasText(photo.getImagePath()) && photo.getFileId() == null) {
                     clearDescriptionCell(photoSheet, slot);
                     continue;
                 }
 
                 try {
-                    ImageResource resource = loadImageResource(photo.getImagePath());
+                    ImageResource resource = loadImageResource(photo);
                     if (resource == null) {
                         clearDescriptionCell(photoSheet, slot);
                         continue;
@@ -510,6 +527,67 @@ public class InspectionRecordExcelExporter {
             points = sheet.getDefaultRowHeightInPoints();
         }
         return Math.max(EMU_PER_POINT, Math.round(points * EMU_PER_POINT));
+    }
+
+    private ImageResource loadImageResource(PhotoItem photo) throws IOException {
+        if (photo == null) {
+            return null;
+        }
+        if (photo.getFileId() != null) {
+            // 优先走文件 ID -> 文件存储的路径解析，确保与后端存储保持一致
+            ImageResource resource = loadImageResource(photo.getFileId());
+            if (resource != null) {
+                return resource;
+            }
+        }
+        if (!StringUtils.hasText(photo.getImagePath())) {
+            return null;
+        }
+        return loadImageResource(photo.getImagePath());
+    }
+
+    private ImageResource loadImageResource(Long fileId) throws IOException {
+        if (fileId == null || sysFileService == null || fileStorage == null) {
+            return null;
+        }
+        SysFile file = sysFileService.getOneById(fileId);
+        if (file == null) {
+            log.warn("未找到文件记录，fileId={}", fileId);
+            return null;
+        }
+        String relativePath;
+        boolean preview = StringUtils.hasText(file.getPreviewPath());
+        if (preview) {
+            relativePath = file.getPreviewPath();
+        } else {
+            relativePath = file.getStoragePath();
+        }
+        if (!StringUtils.hasText(relativePath)) {
+            log.warn("文件缺少可读路径，fileId={}", fileId);
+            return null;
+        }
+        Path absolutePath;
+        try {
+            // 根据是否配置了预览路径决定走预览目录还是原始存储目录
+            absolutePath = preview
+                    ? fileStorage.resolvePreviewAbsolute(relativePath)
+                    : fileStorage.resolveStorageAbsolute(relativePath);
+        } catch (Exception ex) {
+            log.warn("解析文件路径失败，fileId={}", fileId, ex);
+            return null;
+        }
+        if (!Files.exists(absolutePath)) {
+            log.warn("文件不存在，fileId={} path={}", fileId, absolutePath);
+            return null;
+        }
+        byte[] data = Files.readAllBytes(absolutePath);
+        int type;
+        try {
+            type = resolvePictureTypeFromMime(file.getMime());
+        } catch (IllegalArgumentException ex) {
+            type = detectPictureType(data);
+        }
+        return buildImageResource(data, type);
     }
 
     private ImageResource loadImageResource(String location) throws IOException {
