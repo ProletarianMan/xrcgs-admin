@@ -111,6 +111,14 @@ public class DictController {
         return R.ok(true);
     }
 
+    @PostMapping("/sync/cache")
+    @OpLog("手动同步字典缓存")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:sync')")
+    public R<Boolean> syncCache() {
+        dictService.syncAllDictCache();
+        return R.ok(true);
+    }
+
     /* ---------- 查询：按 typeCode ---------- */
 
     @GetMapping("/{typeCode}")
