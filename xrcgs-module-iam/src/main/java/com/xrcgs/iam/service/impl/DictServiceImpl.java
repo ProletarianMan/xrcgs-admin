@@ -7,14 +7,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.datascope.DataScopeManager;
 import com.xrcgs.iam.datascope.EffectiveDataScope;
+import com.xrcgs.iam.entity.SysDept;
 import com.xrcgs.iam.entity.SysDictItem;
 import com.xrcgs.iam.entity.SysDictType;
 import com.xrcgs.iam.entity.SysUser;
+import com.xrcgs.iam.mapper.SysDeptMapper;
 import com.xrcgs.iam.mapper.SysDictItemMapper;
 import com.xrcgs.iam.mapper.SysDictTypeMapper;
 import com.xrcgs.iam.mapper.SysUserMapper;
 import com.xrcgs.iam.model.query.DictItemPageQuery;
 import com.xrcgs.iam.model.query.DictTypePageQuery;
+import com.xrcgs.iam.model.vo.DeptBriefVO;
 import com.xrcgs.iam.model.vo.DictVO;
 import com.xrcgs.iam.service.DictService;
 import com.xrcgs.infrastructure.audit.UserIdProvider;
@@ -24,10 +27,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +44,7 @@ public class DictServiceImpl implements DictService {
 
     private final SysDictTypeMapper typeMapper;
     private final SysDictItemMapper itemMapper;
+    private final SysDeptMapper deptMapper;
     private final AuthCacheService cache;
     private final DataScopeManager dataScopeManager;
     private final UserIdProvider userIdProvider;
@@ -128,6 +137,7 @@ public class DictServiceImpl implements DictService {
                 .stream()
                 .sorted(Comparator.comparing(SysDictItem::getSort).thenComparing(SysDictItem::getId))
                 .toList();
+        Map<Long, SysDept> deptMap = loadDeptMap(items);
 
         DictVO vo = new DictVO();
         vo.setType(typeCode);
@@ -137,6 +147,7 @@ public class DictServiceImpl implements DictService {
             it.setValue(i.getValue());
             it.setSort(i.getSort());
             it.setExt(i.getExt());
+            it.setDept(buildDeptBrief(i.getDeptId(), deptMap));
             return it;
         }).toList();
         vo.setItems(list);
@@ -173,7 +184,15 @@ public class DictServiceImpl implements DictService {
         wrapper.orderByDesc(SysDictItem::getStatus)
                 .orderByAsc(SysDictItem::getSort)
                 .orderByAsc(SysDictItem::getId);
-        return itemMapper.selectPage(page, wrapper);
+        Page<SysDictItem> result = itemMapper.selectPage(page, wrapper);
+        List<SysDictItem> records = result.getRecords();
+        if (records != null && !records.isEmpty()) {
+            Map<Long, SysDept> deptMap = loadDeptMap(records);
+            for (SysDictItem record : records) {
+                record.setDept(buildDeptBrief(record.getDeptId(), deptMap));
+            }
+        }
+        return result;
     }
 
     @Override
@@ -209,20 +228,51 @@ public class DictServiceImpl implements DictService {
             return;
         }
         Set<Long> deptIds = new LinkedHashSet<>(scope.getDeptIds());
-        if (deptIds.isEmpty() && scope.isSelf()) {
+        if (scope.isSelf()) {
             Long deptId = resolveDeptId(userId);
             if (deptId != null) {
                 deptIds.add(deptId);
             }
         }
         if (deptIds.isEmpty()) {
-            wrapper.apply("1 = 0");
+            wrapper.and(w -> w.isNull(SysDictItem::getDeptId));
             return;
         }
-        // 查询条件允许部门为空（公共数据）或命中授权部门列表
         wrapper.and(w -> w.isNull(SysDictItem::getDeptId)
                 .or()
                 .in(SysDictItem::getDeptId, deptIds));
+    }
+
+    private Map<Long, SysDept> loadDeptMap(List<SysDictItem> items) {
+        if (items == null || items.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Set<Long> deptIds = items.stream()
+                .map(SysDictItem::getDeptId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (deptIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<SysDept> depts = deptMapper.selectBatchIds(new ArrayList<>(deptIds));
+        if (depts == null || depts.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        return depts.stream().collect(Collectors.toMap(SysDept::getId, dept -> dept, (a, b) -> a));
+    }
+
+    private DeptBriefVO buildDeptBrief(Long deptId, Map<Long, SysDept> deptMap) {
+        if (deptId == null || deptMap.isEmpty()) {
+            return null;
+        }
+        SysDept dept = deptMap.get(deptId);
+        if (dept == null) {
+            return null;
+        }
+        DeptBriefVO brief = new DeptBriefVO();
+        brief.setId(dept.getId());
+        brief.setName(dept.getName());
+        return brief;
     }
 
     /**
