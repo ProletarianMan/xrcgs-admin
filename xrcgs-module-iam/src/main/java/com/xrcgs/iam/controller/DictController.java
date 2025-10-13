@@ -113,7 +113,7 @@ public class DictController {
 
     @PostMapping("/sync/cache")
     @OpLog("手动同步字典缓存")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:sync')")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:create')")
     public R<Boolean> syncCache() {
         dictService.syncAllDictCache();
         return R.ok(true);

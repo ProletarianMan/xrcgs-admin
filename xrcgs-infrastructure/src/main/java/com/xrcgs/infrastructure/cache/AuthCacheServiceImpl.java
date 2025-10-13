@@ -5,6 +5,7 @@ import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.common.constants.IamCacheKeys;
 import com.xrcgs.iam.datascope.EffectiveDataScope;
 import jakarta.annotation.Resource;
+import org.apache.ibatis.jdbc.Null;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +30,11 @@ public class AuthCacheServiceImpl implements AuthCacheService {
 
     // ✅ 新增温和 TTL（可根据你实际调整） 菜单树和字典
     private static final Duration MENU_TREE_TTL = Duration.ofMinutes(10);
-    private static final Duration DICT_TTL      = Duration.ofMinutes(30);
+    /**
+     * 字典数据变更频率极低，同时提供了定时/手动同步能力，为避免 TTL 到期后出现短暂的缓存穿透，
+     * 字典缓存采用常驻策略（不再设置过期时间）。
+     */
+    private static final Duration DICT_TTL      = null;
     private static final Duration DATA_SCOPE_TTL = Duration.ofHours(8);
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

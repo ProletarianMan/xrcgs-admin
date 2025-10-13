@@ -57,7 +57,7 @@ public class GlobalExceptionHandler {
     public R<Void> handleOther(Exception e) {
         // 生产环境可以隐藏具体异常信息；这里返回统一提示
         log.error(e.getMessage(), e);
-        return R.fail(500, "服务器开小差了" + e.getMessage());
+        return R.fail(500, "服务器开小差了：" + e.getMessage());
     }
 
     @ExceptionHandler({MaxUploadSizeExceededException.class})
