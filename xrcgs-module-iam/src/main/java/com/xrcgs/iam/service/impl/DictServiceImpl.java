@@ -58,14 +58,23 @@ public class DictServiceImpl implements DictService {
         if (c != null && c > 0) throw new IllegalArgumentException("字典类型已存在: " + type.getCode());
         if (type.getStatus() == null) type.setStatus(1);
         typeMapper.insert(type);
+        syncTypeCache(type.getCode());
         return type.getId();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateType(SysDictType type) {
+        SysDictType origin = type.getId() == null ? null : typeMapper.selectById(type.getId());
         typeMapper.updateById(type);
-        if (type.getCode() != null) cache.evictDict(type.getCode());
+        String newCode = StringUtils.hasText(type.getCode())
+                ? type.getCode()
+                : origin != null ? origin.getCode() : null;
+        if (origin != null && StringUtils.hasText(origin.getCode())
+                && !Objects.equals(origin.getCode(), newCode)) {
+            cache.evictDict(origin.getCode());
+        }
+        syncTypeCache(newCode);
     }
 
     @Override
@@ -88,15 +97,20 @@ public class DictServiceImpl implements DictService {
             item.setDeptId(resolveDeptId(currentUserId));
         }
         itemMapper.insert(item);
-        cache.evictDict(item.getTypeCode());
+        syncTypeCache(item.getTypeCode());
         return item.getId();
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateItem(SysDictItem item) {
+        SysDictItem origin = item.getId() == null ? null : itemMapper.selectById(item.getId());
         itemMapper.updateById(item);
-        cache.evictDict(item.getTypeCode());
+        if (origin != null && StringUtils.hasText(origin.getTypeCode())
+                && !Objects.equals(origin.getTypeCode(), item.getTypeCode())) {
+            syncTypeCache(origin.getTypeCode());
+        }
+        syncTypeCache(item.getTypeCode());
     }
 
     @Override
@@ -105,7 +119,7 @@ public class DictServiceImpl implements DictService {
         SysDictItem item = itemMapper.selectById(id);
         if (item != null) {
             itemMapper.deleteById(id);
-            cache.evictDict(item.getTypeCode());
+            syncTypeCache(item.getTypeCode());
         }
     }
 
@@ -126,36 +140,22 @@ public class DictServiceImpl implements DictService {
 
         SysDictType t = typeMapper.selectOne(Wrappers.<SysDictType>lambdaQuery()
                 .eq(SysDictType::getCode, typeCode));
-        if (t == null || t.getStatus() != 1) return null;
+        if (t == null || t.getStatus() == null || t.getStatus() != 1) {
+            cache.evictDict(typeCode);
+            return null;
+        }
 
         LambdaQueryWrapper<SysDictItem> wrapper = Wrappers.<SysDictItem>lambdaQuery()
                 .eq(SysDictItem::getTypeCode, typeCode)
                 .eq(SysDictItem::getStatus, 1);
         // 根据数据范围拼接部门过滤条件
         applyDeptScope(wrapper, scope, userId);
-        List<SysDictItem> items = itemMapper.selectList(wrapper)
-                .stream()
-                .sorted(Comparator.comparing(SysDictItem::getSort).thenComparing(SysDictItem::getId))
-                .toList();
-        Map<Long, SysDept> deptMap = loadDeptMap(items);
+        List<SysDictItem> items = itemMapper.selectList(wrapper);
 
-        DictVO vo = new DictVO();
-        vo.setType(typeCode);
-        List<DictVO.Item> list = items.stream().map(i -> {
-            DictVO.Item it = new DictVO.Item();
-            it.setLabel(i.getLabel());
-            it.setValue(i.getValue());
-            it.setSort(i.getSort());
-            it.setExt(i.getExt());
-            it.setDept(buildDeptBrief(i.getDeptId(), deptMap));
-            return it;
-        }).toList();
-        vo.setItems(list);
+        DictVO vo = buildDictVO(t, items);
 
         if (useGlobalCache) {
-            try {
-                cache.cacheDict(typeCode, om.writeValueAsString(vo));
-            } catch (Exception ignore) {}
+            cacheDictSafely(typeCode, vo);
         }
         return vo;
     }
@@ -163,6 +163,43 @@ public class DictServiceImpl implements DictService {
     @Override
     public void evictType(String typeCode) {
         cache.evictDict(typeCode);
+    }
+
+    @Override
+    public void syncAllDictCache() {
+        List<SysDictType> types = typeMapper.selectList(Wrappers.<SysDictType>lambdaQuery());
+        if (types == null || types.isEmpty()) {
+            return;
+        }
+        List<SysDictItem> allItems = itemMapper.selectList(Wrappers.<SysDictItem>lambdaQuery()
+                .eq(SysDictItem::getStatus, 1));
+        Map<String, List<SysDictItem>> grouped = allItems == null
+                ? Collections.emptyMap()
+                : allItems.stream().collect(Collectors.groupingBy(SysDictItem::getTypeCode));
+        for (SysDictType type : types) {
+            if (type == null || !StringUtils.hasText(type.getCode())) {
+                continue;
+            }
+            List<SysDictItem> list = grouped.getOrDefault(type.getCode(), Collections.emptyList());
+            refreshCache(type, list);
+        }
+    }
+
+    @Override
+    public void syncTypeCache(String typeCode) {
+        if (!StringUtils.hasText(typeCode)) {
+            return;
+        }
+        SysDictType type = typeMapper.selectOne(Wrappers.<SysDictType>lambdaQuery()
+                .eq(SysDictType::getCode, typeCode));
+        if (type == null) {
+            cache.evictDict(typeCode);
+            return;
+        }
+        List<SysDictItem> items = itemMapper.selectList(Wrappers.<SysDictItem>lambdaQuery()
+                .eq(SysDictItem::getTypeCode, type.getCode())
+                .eq(SysDictItem::getStatus, 1));
+        refreshCache(type, items);
     }
 
     @Override
@@ -217,6 +254,69 @@ public class DictServiceImpl implements DictService {
         }
         wrapper.orderByAsc(SysDictType::getId);
         return typeMapper.selectList(wrapper);
+    }
+
+    private void refreshCache(SysDictType type, List<SysDictItem> items) {
+        if (type == null || !StringUtils.hasText(type.getCode())) {
+            return;
+        }
+        if (type.getStatus() == null || type.getStatus() != 1) {
+            cache.evictDict(type.getCode());
+            return;
+        }
+        DictVO vo = buildDictVO(type, items);
+        cacheDictSafely(type.getCode(), vo);
+    }
+
+    private void cacheDictSafely(String typeCode, DictVO vo) {
+        if (!StringUtils.hasText(typeCode)) {
+            return;
+        }
+        if (vo == null) {
+            cache.evictDict(typeCode);
+            return;
+        }
+        try {
+            cache.cacheDict(typeCode, om.writeValueAsString(vo));
+        } catch (Exception ex) {
+            log.warn("同步字典缓存失败 typeCode={} err={}", typeCode, ex.getMessage());
+        }
+    }
+
+    private DictVO buildDictVO(SysDictType type, List<SysDictItem> items) {
+        if (type == null || type.getStatus() == null || type.getStatus() != 1 || !StringUtils.hasText(type.getCode())) {
+            return null;
+        }
+        List<SysDictItem> sorted = filterAndSort(items);
+        Map<Long, SysDept> deptMap = loadDeptMap(sorted);
+
+        DictVO vo = new DictVO();
+        vo.setType(type.getCode());
+        List<DictVO.Item> list = sorted.stream().map(i -> {
+            DictVO.Item it = new DictVO.Item();
+            it.setLabel(i.getLabel());
+            it.setValue(i.getValue());
+            it.setSort(i.getSort());
+            it.setExt(i.getExt());
+            it.setDept(buildDeptBrief(i.getDeptId(), deptMap));
+            return it;
+        }).toList();
+        vo.setItems(list);
+        return vo;
+    }
+
+    private List<SysDictItem> filterAndSort(List<SysDictItem> items) {
+        if (items == null || items.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Comparator<SysDictItem> comparator = Comparator
+                .comparing(SysDictItem::getSort, Comparator.nullsLast(Integer::compareTo))
+                .thenComparing(SysDictItem::getId, Comparator.nullsLast(Long::compareTo));
+        return items.stream()
+                .filter(Objects::nonNull)
+                .filter(i -> i.getStatus() != null && i.getStatus() == 1)
+                .sorted(comparator)
+                .toList();
     }
 
     /**

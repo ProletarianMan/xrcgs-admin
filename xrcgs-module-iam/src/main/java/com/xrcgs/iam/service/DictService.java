@@ -21,6 +21,18 @@ public interface DictService {
     DictVO getByType(String typeCode); // 带缓存
     void evictType(String typeCode); // 逐出类型
 
+    /**
+     * 全量同步 Redis 字典缓存。
+     */
+    void syncAllDictCache();
+
+    /**
+     * 按类型增量刷新 Redis 字典缓存。
+     *
+     * @param typeCode 字典类型编码
+     */
+    void syncTypeCache(String typeCode);
+
     // -------- 新增：字典项分页 --------
     Page<SysDictItem> pageItems(DictItemPageQuery q, long pageNo, long pageSize);
 
