@@ -2,7 +2,9 @@ package com.xrcgs.iam.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.xrcgs.iam.model.vo.DeptBriefVO;
 import lombok.Data;
+
 import java.time.LocalDateTime;
 
 /**
@@ -22,6 +24,9 @@ public class SysDictItem {
     private Integer status; // 1启用 0禁用
 
     private Long deptId; // 归属部门
+
+    @TableField(exist = false)
+    private DeptBriefVO dept;
 
     @JsonFormat(pattern = "yyy-MM-dd")
     @TableField(value = "created_at", fill = FieldFill.INSERT)

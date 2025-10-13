@@ -1,6 +1,7 @@
 package com.xrcgs.iam.model.vo;
 
 import lombok.Data;
+
 import java.util.List;
 
 /**
@@ -15,6 +16,7 @@ public class DictVO {
         private String value;
         private Integer sort;
         private String ext;
+        private DeptBriefVO dept;
     }
     private List<Item> items;
 }
