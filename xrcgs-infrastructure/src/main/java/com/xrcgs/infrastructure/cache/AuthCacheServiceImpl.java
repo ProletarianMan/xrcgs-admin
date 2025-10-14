@@ -121,7 +121,7 @@ public class AuthCacheServiceImpl implements AuthCacheService {
     @Override
     public void cacheDict(String typeCode, String json) {
         stringRedisTemplate.opsForValue()
-                .set(IamCacheKeys.DICT_TYPE + typeCode, json, DICT_TTL);
+                .set(IamCacheKeys.DICT_TYPE + typeCode, json);
     }
 
     @Override

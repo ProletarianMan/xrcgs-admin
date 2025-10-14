@@ -121,8 +121,8 @@ public class DictController {
 
     /* ---------- 查询：按 typeCode ---------- */
 
-    @GetMapping("/{typeCode}")
-    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:get')")
+    @GetMapping("/getType/{typeCode}")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:list')")
     public R<DictVO> getByType(@PathVariable @NotBlank String typeCode) {
         return R.ok(dictService.getByType(typeCode));
     }
