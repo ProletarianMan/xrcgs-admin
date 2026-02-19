@@ -1,63 +1,100 @@
 spring:
   datasource:
+    # 主库 JDBC 地址（xrcgs_admin）
     url: jdbc:mysql://localhost:3306/xrcgs_admin?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    # 主库用户名（可用环境变量覆盖）
     username: ${DB_USER:root}
+    # 主库密码（可用环境变量覆盖）
     password: ${DB_PASS:root}
     hikari:
+      # 主库连接池最大连接数
       maximum-pool-size: 10
+      # 主库连接池最小空闲
       minimum-idle: 1
+    # MySQL 驱动类
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+    # 路产库数据源（xrcgs_roadSafety）
     road-safety:
+      # 路产库 JDBC 地址
       url: jdbc:mysql://localhost:3306/xrcgs_roadSafety?useUnicode=true&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      # 路产库用户名（默认跟主库）
       username: ${DB_ROAD_SAFETY_USER:${DB_USER:root}}
+      # 路产库密码（默认跟主库）
       password: ${DB_ROAD_SAFETY_PASS:${DB_PASS:root}}
+      # 路产库驱动类
       driver-class-name: com.mysql.cj.jdbc.Driver
       hikari:
+        # 路产库连接池最大连接数
         maximum-pool-size: 5
+        # 路产库连接池最小空闲
         minimum-idle: 1
 
+  # Spring Data 配置
   data:
+    # Redis 配置
     redis:
+      # Redis 主机
       host: localhost
+      # Redis 端口
       port: 6379
+      # Redis 库号
       database: 0
+      # Redis 密码（可用环境变量覆盖）
       password: ${RD_PASS:root}
 
 syslog:
+  # AOP 日志总开关
   enabled: true
+  # 请求/响应体最大记录长度
   maxBodyLength: 2048
+  # 是否记录响应体
   logResult: true
+  # 清理任务配置
   cleanup:
+    # 是否启用清理任务
     enabled: true
+    # 保留天数
     retention-days: 30
+    # 清理 Cron
     cron: 0 30 3 * * ?
-    batch-size: 0 # 或者 5000，取决于你的数据量
+    # 单次批量删除大小（<=0 不分批）
+    batch-size: 0 # 0 表示不分批，可按数据量调整
 
-#    retentionDays: 0   # ← 现在之前的所有记录都视为过期（用于测试）
-#    cron: "*/30 * * * * ?"  # ← 每 30 秒跑一次，验证后改回去
-#    batchSize: 1000
+#    retentionDays: 0   # 仅用于测试：将所有历史记录视为过期
+#    cron: "*/30 * * * * ?"  # 仅用于测试：每 30 秒执行一次
+#    batchSize: 1000 # 仅用于测试：单次删除 1000 条
 
 file:
-  storage-root: data/uploads  #存储地址
-  preview-root: data/preview  #预览地址
-  max-size: 1073741824  # 文件校验最大1GB
-  preview-auth-required: false   #预览权限验证
+  # 文件存储配置
+  # 文件存储根目录（相对/绝对）
+  storage-root: data/uploads  # 存储根目录
+  # 预览/转换输出目录
+  preview-root: data/preview  # 预览目录
+  # 单文件最大字节数
+  max-size: 1073741824  # 1GB
+  # 预览是否需要鉴权
+  preview-auth-required: false
 
-  # 可选：扩/改白名单（默认已内置常用类型）
+  # 可选：扩展名白名单（默认内置常用类型）
   # allowed-exts: [jpg,jpeg,png,webp,gif,doc,docx,xls,xlsx,ppt,pptx,pdf,mp4,mp3]
   # allowed-mimes: [image/,application/pdf,video/,audio/,application/vnd.openxmlformats-officedocument.wordprocessingml.document]
 
-# 转换相关
 convert:
-  timeout-ms: 300000  #5分钟
+  # 文档转换配置
+  # 转换超时时间（毫秒）
+  timeout-ms: 300000
+  # 转换线程池大小
   pool-size: 2
 
-# LibreOffice 安装路径（如放空则按系统默认）
 libreoffice:
-  home: ""    # Linux: /opt/libreoffice7.6 ；Windows: C:\Program Files\LibreOffice\program\soffice.exe 的上级目录
+  # LibreOffice 安装根目录（留空自动探测）
+  # Linux: /opt/libreoffice7.6  Windows: C:\Program Files\LibreOffice
+  home: ""
   
-# 路产安全相关文件配置（此处可以自定义）
 road-safety:
-  inspection-log: data/inspection-logs  # 巡查日志Excel持久化目录
-  log-template: /xrcgs-admin/xrcgs-admin/data/template/inspection_record.xlsx #日志模板文件
+  # 路产日志配置
+  # 巡查日志导出目录
+  inspection-log: data/inspection-logs
+  # Excel 模板路径（相对/绝对）
+  log-template: /xrcgs-admin/xrcgs-admin/data/template/inspection_record.xlsx
