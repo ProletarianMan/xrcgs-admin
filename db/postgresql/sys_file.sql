@@ -1,0 +1,23 @@
+CREATE TABLE `sys_file` (
+  `id` bigint NOT NULL COMMENT '主键（雪花/自增皆可，这里建议雪花）',
+  `biz_type` varchar(64) NOT NULL COMMENT '业务类型（如 ROAD_COMPENSATION / DATA_ISSUE_HAZARD 等）',
+  `file_type` varchar(16) NOT NULL COMMENT '文件大类：IMAGE/DOC/VIDEO/AUDIO',
+  `original_name` varchar(255) NOT NULL COMMENT '原始文件名',
+  `ext` varchar(32) NOT NULL COMMENT '扩展名（不含点）',
+  `mime` varchar(128) NOT NULL COMMENT 'MIME 类型',
+  `size` bigint NOT NULL COMMENT '字节大小',
+  `sha256` char(64) NOT NULL COMMENT '文件 SHA-256',
+  `storage_path` varchar(512) NOT NULL COMMENT '物理存储相对路径（data/uploads/...）',
+  `preview_path` varchar(512) DEFAULT NULL COMMENT '转换/预览相对路径（data/preview/...）',
+  `status` varchar(16) NOT NULL DEFAULT 'UPLOADED' COMMENT 'UPLOADED/CONVERTING/READY/FAIL/DELETED',
+  `error_msg` varchar(1024) DEFAULT NULL COMMENT '错误信息（转换失败等）',
+  `dept_id` bigint DEFAULT NULL COMMENT '归属部门 ID',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `created_by` bigint DEFAULT NULL COMMENT '创建人（用户ID，若有）',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_sha256` (`sha256`),
+  KEY `idx_biz_type` (`biz_type`),
+  KEY `idx_file_type` (`file_type`),
+  KEY `idx_created_at` (`created_at`),
+  KEY `idx_dept_id` (`dept_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统文件表';

@@ -1,0 +1,21 @@
+CREATE TABLE `sys_op_log` (
+                              `id` bigint NOT NULL,
+                              `title` varchar(255) DEFAULT NULL COMMENT '操作标题',
+                              `username` varchar(64) DEFAULT NULL COMMENT '用户名',
+                              `methodSign` varchar(255) DEFAULT NULL COMMENT '方法签名',
+                              `httpMethod` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT 'Get/Post',
+                              `uri` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '请求地址',
+                              `ip` varchar(64) DEFAULT NULL,
+                              `queryString` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci DEFAULT NULL COMMENT '参数',
+                              `reqBody` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT '入参',
+                              `respBody` mediumtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci COMMENT '出参',
+                              `success` tinyint(1) DEFAULT '1',
+                              `elapsedMs` bigint DEFAULT NULL,
+                              `exceptionMsg` varchar(1024) DEFAULT NULL,
+                              `createdAt` datetime DEFAULT CURRENT_TIMESTAMP,
+                              PRIMARY KEY (`id`),
+                              KEY `idx_sysoplog_created` (`createdAt`),
+                              KEY `idx_sysoplog_user` (`username`),
+                              KEY `idx_sysoplog_uri` (`uri`),
+                              KEY `idx_sysoplog_title` (`title`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统操作日志';

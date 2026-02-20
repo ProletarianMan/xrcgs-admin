@@ -1,0 +1,20 @@
+CREATE TABLE `sys_user` (
+  `id` bigint NOT NULL,
+  `username` varchar(64) NOT NULL,
+  `password` varchar(200) NOT NULL,
+  `nickname` varchar(64) DEFAULT NULL,
+  `wechat_id` varchar(64) DEFAULT NULL COMMENT '微信号',
+  `phone` varchar(32) DEFAULT NULL COMMENT '联系电话',
+  `gender` tinyint(1) DEFAULT NULL COMMENT '性别：0-女，1-男',
+  `dept_id` bigint unsigned DEFAULT NULL COMMENT '主部门 ID',
+  `extra_dept_ids` json DEFAULT NULL COMMENT '附加部门 ID 列表（JSON 数组，如 [1,2,3]）',
+  `data_scope` varchar(32) NOT NULL DEFAULT 'SELF' COMMENT '数据范围：ALL/DEPT/DEPT_AND_CHILD/SELF/CUSTOM',
+  `data_scope_ext` json DEFAULT NULL COMMENT '扩展数据范围，CUSTOM 时存 JSON 数组',
+  `enabled` tinyint DEFAULT '1',
+  `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `username` (`username`),
+  KEY `idx_sys_user_dept_id` (`dept_id`),
+  KEY `nickname` (`nickname`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
