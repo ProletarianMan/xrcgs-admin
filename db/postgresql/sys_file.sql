@@ -1,23 +1,43 @@
-CREATE TABLE `sys_file` (
-  `id` bigint NOT NULL COMMENT '主键（雪花/自增皆可，这里建议雪花）',
-  `biz_type` varchar(64) NOT NULL COMMENT '业务类型（如 ROAD_COMPENSATION / DATA_ISSUE_HAZARD 等）',
-  `file_type` varchar(16) NOT NULL COMMENT '文件大类：IMAGE/DOC/VIDEO/AUDIO',
-  `original_name` varchar(255) NOT NULL COMMENT '原始文件名',
-  `ext` varchar(32) NOT NULL COMMENT '扩展名（不含点）',
-  `mime` varchar(128) NOT NULL COMMENT 'MIME 类型',
-  `size` bigint NOT NULL COMMENT '字节大小',
-  `sha256` char(64) NOT NULL COMMENT '文件 SHA-256',
-  `storage_path` varchar(512) NOT NULL COMMENT '物理存储相对路径（data/uploads/...）',
-  `preview_path` varchar(512) DEFAULT NULL COMMENT '转换/预览相对路径（data/preview/...）',
-  `status` varchar(16) NOT NULL DEFAULT 'UPLOADED' COMMENT 'UPLOADED/CONVERTING/READY/FAIL/DELETED',
-  `error_msg` varchar(1024) DEFAULT NULL COMMENT '错误信息（转换失败等）',
-  `dept_id` bigint DEFAULT NULL COMMENT '归属部门 ID',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人（用户ID，若有）',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_sha256` (`sha256`),
-  KEY `idx_biz_type` (`biz_type`),
-  KEY `idx_file_type` (`file_type`),
-  KEY `idx_created_at` (`created_at`),
-  KEY `idx_dept_id` (`dept_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='系统文件表';
+-- PostgreSQL 16 初始化脚本：xrcgs_admin 文件表
+-- CREATE DATABASE xrcgs_admin;
+-- COMMENT ON DATABASE xrcgs_admin IS 'XRCGS 管理后台主业务数据库';
+
+CREATE TABLE IF NOT EXISTS sys_file (
+  id BIGINT PRIMARY KEY,
+  biz_type VARCHAR(64) NOT NULL,
+  file_type VARCHAR(16) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  ext VARCHAR(32) NOT NULL,
+  mime VARCHAR(128) NOT NULL,
+  size BIGINT NOT NULL,
+  sha256 CHAR(64) NOT NULL UNIQUE,
+  storage_path VARCHAR(512) NOT NULL,
+  preview_path VARCHAR(512),
+  status VARCHAR(16) NOT NULL DEFAULT 'UPLOADED',
+  error_msg VARCHAR(1024),
+  dept_id BIGINT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_by BIGINT
+);
+
+CREATE INDEX IF NOT EXISTS idx_file_biz_type ON sys_file(biz_type);
+CREATE INDEX IF NOT EXISTS idx_file_type ON sys_file(file_type);
+CREATE INDEX IF NOT EXISTS idx_file_created_at ON sys_file(created_at);
+CREATE INDEX IF NOT EXISTS idx_file_dept_id ON sys_file(dept_id);
+
+COMMENT ON TABLE sys_file IS '系统文件表';
+COMMENT ON COLUMN sys_file.id IS '主键 ID';
+COMMENT ON COLUMN sys_file.biz_type IS '业务类型';
+COMMENT ON COLUMN sys_file.file_type IS '文件大类：IMAGE/DOC/VIDEO/AUDIO';
+COMMENT ON COLUMN sys_file.original_name IS '原始文件名';
+COMMENT ON COLUMN sys_file.ext IS '文件扩展名（不含点）';
+COMMENT ON COLUMN sys_file.mime IS 'MIME 类型';
+COMMENT ON COLUMN sys_file.size IS '文件大小（字节）';
+COMMENT ON COLUMN sys_file.sha256 IS '文件 SHA-256 哈希';
+COMMENT ON COLUMN sys_file.storage_path IS '物理存储相对路径';
+COMMENT ON COLUMN sys_file.preview_path IS '预览/转换输出相对路径';
+COMMENT ON COLUMN sys_file.status IS '文件状态：UPLOADED/CONVERTING/READY/FAIL/DELETED';
+COMMENT ON COLUMN sys_file.error_msg IS '失败错误信息';
+COMMENT ON COLUMN sys_file.dept_id IS '归属部门 ID';
+COMMENT ON COLUMN sys_file.created_at IS '创建时间';
+COMMENT ON COLUMN sys_file.created_by IS '创建人用户 ID';
