@@ -9,6 +9,7 @@ spring:
     group:
       dev: [dev, local]
       prod: [prod]
+    active: local
   servlet:
     multipart:
       max-file-size: 500MB  # 单个文件

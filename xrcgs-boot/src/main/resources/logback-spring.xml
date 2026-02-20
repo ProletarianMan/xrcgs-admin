@@ -13,10 +13,25 @@
             </encoder>
         </appender>
 
-        <!-- 项目包建议维持 INFO，过多 DEBUG 容易刷屏；需要时临时升 DEBUG -->
+        <!-- 项目包建议维�?INFO，过�?DEBUG 容易刷屏；需要时临时�?DEBUG -->
         <logger name="com.xrcgs" level="INFO"/>
 
-        <!-- ⭐ 要求：开发环境 root 设为 INFO -->
+        <!-- �?要求：开发环�?root 设为 INFO -->
+        <root level="INFO">
+            <appender-ref ref="STDOUT"/>
+        </root>
+    </springProfile>
+    <!-- ===== LOCAL: 控制台，root=INFO ===== -->
+    <springProfile name="local">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} %highlight(%-5level) [%thread] traceId=%X{traceId:-} %cyan(%logger{36}) - %msg%n</pattern>
+                <charset>UTF-8</charset>
+            </encoder>
+        </appender>
+
+        <logger name="com.xrcgs" level="INFO"/>
+
         <root level="INFO">
             <appender-ref ref="STDOUT"/>
         </root>
@@ -37,12 +52,16 @@
             </rollingPolicy>
         </appender>
 
-        <!-- 生产包级别也随 root 降噪；需要更细粒度时再单独加 -->
+        <!-- 生产包级别也�?root 降噪；需要更细粒度时再单独加 -->
         <logger name="com.xrcgs" level="ERROR"/>
 
-        <!-- ⭐ 要求：生产环境 root 设为 ERROR -->
+        <!-- �?要求：生产环�?root 设为 ERROR -->
         <root level="ERROR">
             <appender-ref ref="FILE"/>
         </root>
     </springProfile>
 </configuration>
+
+
+
+

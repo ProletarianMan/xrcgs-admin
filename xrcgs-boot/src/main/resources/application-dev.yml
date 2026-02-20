@@ -87,7 +87,7 @@ convert:
 # LibreOffice 本地转换配置
 libreoffice:
   # LibreOffice 安装目录（留空表示自动探测）
-  home: ""
+  home: ''
 
 # 路产安全业务模块配置
 road-safety:
