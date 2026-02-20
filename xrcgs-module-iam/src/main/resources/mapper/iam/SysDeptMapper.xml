@@ -54,7 +54,7 @@
 
     <update id="updatePathPrefix">
         UPDATE sys_dept
-        SET path = CONCAT(#{newPath}, SUBSTRING(path, CHAR_LENGTH(#{oldPath}) + 1)),
+        SET path = CONCAT(#{newPath}, SUBSTRING(path FROM CHAR_LENGTH(#{oldPath}) + 1)),
             update_time = NOW()
         WHERE path LIKE CONCAT(#{oldPath}, '%')
     </update>

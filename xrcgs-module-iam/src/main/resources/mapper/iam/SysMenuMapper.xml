@@ -25,7 +25,7 @@
 
     <select id="selectListByQuery" resultMap="MenuMap">
         SELECT id, parent_id, title, router_name, path, component, type, perms,
-               icon, `rank`, keep_alive, show_parent, visible, `status`,
+               icon, rank, keep_alive, show_parent, visible, status,
                created_at, updated_at, del_flag
         FROM sys_menu
         WHERE del_flag = 0
@@ -36,7 +36,7 @@
                 OR perms LIKE CONCAT('%', #{q.keyword}, '%'))
             </if>
             <if test="q.status != null">
-                AND `status` = #{q.status}
+                AND status = #{q.status}
             </if>
             <if test="q.type != null">
                 AND type = #{q.type}
@@ -48,24 +48,24 @@
                 AND visible = #{q.visible}
             </if>
         </if>
-        ORDER BY `rank` ASC, id ASC
+        ORDER BY rank ASC, id ASC
     </select>
 
     <!-- 通过角色查菜单（基于角色-菜单表） -->
     <select id="selectByRoleId" resultMap="MenuMap">
         SELECT m.id, m.parent_id, m.title, m.router_name, m.path, m.component,
-               m.type, m.perms, m.icon, m.`rank`, m.keep_alive, m.show_parent,
-               m.visible, m.`status`, m.created_at, m.updated_at, m.del_flag
+               m.type, m.perms, m.icon, m.rank, m.keep_alive, m.show_parent,
+               m.visible, m.status, m.created_at, m.updated_at, m.del_flag
         FROM sys_menu m
                  INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
         WHERE rm.role_id = #{roleId} AND m.del_flag = 0
-        ORDER BY m.`rank` ASC, m.id ASC
+        ORDER BY m.rank ASC, m.id ASC
     </select>
 
     <select id="selectByRoleIds" resultMap="MenuMap">
         SELECT DISTINCT m.id, m.parent_id, m.title, m.router_name, m.path, m.component,
-               m.type, m.perms, m.icon, m.`rank`, m.keep_alive, m.show_parent,
-               m.visible, m.`status`, m.created_at, m.updated_at, m.del_flag
+               m.type, m.perms, m.icon, m.rank, m.keep_alive, m.show_parent,
+               m.visible, m.status, m.created_at, m.updated_at, m.del_flag
         FROM sys_menu m
                  INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
         WHERE rm.role_id IN
@@ -74,7 +74,7 @@
         </foreach>
           AND m.del_flag = 0
           AND m.type IN ('DIR','MENU')
-        ORDER BY m.`rank` ASC, m.id ASC
+        ORDER BY m.rank ASC, m.id ASC
     </select>
 
 </mapper>
