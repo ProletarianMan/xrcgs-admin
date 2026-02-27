@@ -16,5 +16,5 @@ public interface RoleService {
     void grantPerms(RoleGrantPermDTO dto);
     Page<RolePageVO> page(RolePageQuery q, long pageNo, long pageSize);
     List<Long> listMenuIdsByRole(Long roleId);
-    List<Long> listPermIdsByRole(Long roleId);
+    List<String> listPermIdsByRole(Long roleId);
 }

@@ -211,11 +211,16 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
-    public List<Long> listPermIdsByRole(Long roleId) {
+    public List<String> listPermIdsByRole(Long roleId) {
         List<SysRolePerm> list = rolePermMapper.selectList(
                 Wrappers.<SysRolePerm>lambdaQuery().eq(SysRolePerm::getRoleId, roleId));
-        List<Long> ids = new ArrayList<>();
-        for (SysRolePerm rp : list) ids.add(rp.getPermId());
+        List<String> ids = new ArrayList<>();
+        for (SysRolePerm rp : list) {
+            Long pid = rp.getPermId();
+            if (pid != null) {
+                ids.add(String.valueOf(pid));
+            }
+        }
         return ids;
     }
 

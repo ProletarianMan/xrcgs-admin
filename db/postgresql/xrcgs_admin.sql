@@ -129,17 +129,17 @@ CREATE TABLE "public"."sys_op_log" (
   "id" int8 NOT NULL,
   "title" varchar(255) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "username" varchar(64) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
-  "methodSign" varchar(255) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
-  "httpMethod" varchar(16) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
+  "methodsign" varchar(255) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
+  "httpmethod" varchar(16) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "uri" varchar(255) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "ip" varchar(64) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
-  "queryString" varchar(1024) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
-  "reqBody" text COLLATE "pg_catalog"."default",
-  "respBody" text COLLATE "pg_catalog"."default",
+  "querystring" varchar(1024) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
+  "reqbody" text COLLATE "pg_catalog"."default",
+  "respbody" text COLLATE "pg_catalog"."default",
   "success" bool DEFAULT true,
-  "elapsedMs" int8,
-  "exceptionMsg" varchar(1024) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
-  "createdAt" timestamp(6) DEFAULT CURRENT_TIMESTAMP
+  "elapsedms" int8,
+  "exceptionmsg" varchar(1024) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
+  "createdat" timestamp(6) DEFAULT CURRENT_TIMESTAMP
 )
 ;
 
@@ -148,13 +148,16 @@ CREATE TABLE "public"."sys_op_log" (
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."sys_permission";
 CREATE TABLE "public"."sys_permission" (
-  "id" int8 NOT NULL,
-  "code" varchar(128) COLLATE "pg_catalog"."default" NOT NULL,
-  "name" varchar(64) COLLATE "pg_catalog"."default" NOT NULL,
-  "created_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP
-)
-;
+    "id" int8 NOT NULL,
+    "parent_id" int8 NOT NULL DEFAULT 0,
+    "code" varchar(128) COLLATE "pg_catalog"."default" NOT NULL,
+    "name" varchar(64) COLLATE "pg_catalog"."default" NOT NULL,
+    "remark" varchar(255) COLLATE "pg_catalog"."default",
+    "sort_no" int4 NOT NULL DEFAULT 0,
+    "created_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP
+  )
+  ;
 
 -- ----------------------------
 -- Table structure for sys_role
@@ -211,7 +214,7 @@ CREATE TABLE "public"."sys_user" (
   "nickname" varchar(64) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "wechat_id" varchar(64) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "phone" varchar(32) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
-  "gender" bool,
+  "gender" int2,
   "dept_id" int8,
   "extra_dept_ids" jsonb,
   "data_scope" varchar(32) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'SELF'::character varying,
@@ -303,6 +306,7 @@ ALTER TABLE "public"."sys_role_perm" ADD CONSTRAINT "sys_role_perm_pkey" PRIMARY
 -- Primary Key structure for table sys_user
 -- ----------------------------
 ALTER TABLE "public"."sys_user" ADD CONSTRAINT "sys_user_pkey" PRIMARY KEY ("id");
+ALTER TABLE "public"."sys_user" ADD CONSTRAINT "chk_sys_user_gender" CHECK ("gender" IS NULL OR "gender" = ANY (ARRAY[0, 1]));
 
 -- ----------------------------
 -- Primary Key structure for table sys_user_role

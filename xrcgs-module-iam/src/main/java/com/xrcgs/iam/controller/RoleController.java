@@ -81,7 +81,7 @@ public class RoleController {
     // 角色拥有的权限ID（独立权限表，可选）
     @GetMapping("/{id}/perm-ids")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:role:grantPerm')")
-    public R<List<Long>> listRolePermIds(@PathVariable @NotNull Long id) {
+    public R<List<String>> listRolePermIds(@PathVariable @NotNull Long id) {
         return R.ok(roleService.listPermIdsByRole(id));
     }
 
