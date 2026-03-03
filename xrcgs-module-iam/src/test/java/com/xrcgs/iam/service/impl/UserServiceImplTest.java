@@ -356,6 +356,47 @@ class UserServiceImplTest {
     }
 
     @Test
+    void pageShouldExpandDeptIdToSubtreeDeptIds() {
+        Page<SysUser> mpPage = new Page<>(1, 10);
+        mpPage.setTotal(0);
+        mpPage.setPages(0);
+        mpPage.setRecords(Collections.emptyList());
+        when(userMapper.selectPage(any(Page.class), any(UserPageQuery.class))).thenReturn(mpPage);
+
+        SysDept dept = new SysDept();
+        dept.setId(2L);
+        dept.setPath("/1/2/");
+        when(sysDeptMapper.selectById(2L)).thenReturn(dept);
+        when(sysDeptMapper.selectIdsByPathPrefix("/1/2/")).thenReturn(List.of(2L, 3L));
+
+        UserPageQuery query = new UserPageQuery();
+        query.setDeptId(2L);
+        userService.page(query, 1, 10);
+
+        ArgumentCaptor<UserPageQuery> queryCaptor = ArgumentCaptor.forClass(UserPageQuery.class);
+        verify(userMapper).selectPage(any(Page.class), queryCaptor.capture());
+        assertEquals(List.of(2L, 3L), queryCaptor.getValue().getDeptIds());
+    }
+
+    @Test
+    void pageShouldFallbackToDeptIdWhenDeptMissing() {
+        Page<SysUser> mpPage = new Page<>(1, 10);
+        mpPage.setTotal(0);
+        mpPage.setPages(0);
+        mpPage.setRecords(Collections.emptyList());
+        when(userMapper.selectPage(any(Page.class), any(UserPageQuery.class))).thenReturn(mpPage);
+        when(sysDeptMapper.selectById(99L)).thenReturn(null);
+
+        UserPageQuery query = new UserPageQuery();
+        query.setDeptId(99L);
+        userService.page(query, 1, 10);
+
+        ArgumentCaptor<UserPageQuery> queryCaptor = ArgumentCaptor.forClass(UserPageQuery.class);
+        verify(userMapper).selectPage(any(Page.class), queryCaptor.capture());
+        assertEquals(List.of(99L), queryCaptor.getValue().getDeptIds());
+    }
+
+    @Test
     void detailShouldReturnVo() {
         SysUser record = new SysUser();
         record.setId(8L);

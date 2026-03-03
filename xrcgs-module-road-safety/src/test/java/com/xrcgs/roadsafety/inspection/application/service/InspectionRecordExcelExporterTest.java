@@ -122,19 +122,14 @@ class InspectionRecordExcelExporterTest {
             String normalizedHandling = handlingText.replace("\r\n", "\n");
             assertThat(normalizedHandling)
                     .startsWith("巡查、处理情况：")
-                    .contains("巡查内容：路面、桥涵专项巡查。")
-                    .contains("问题描述：发现1处沉陷。")
-                    .contains("处理情况（原始记录）：现场设置警戒并安排抢修。")
-                    .contains("一、道路病害或损坏情况：")
-                    .contains("- 路面沉陷处设置警示标志。")
-                    .contains("二、交通事故或清障救援情况：")
-                    .contains("（交通事故）")
-                    .contains("- 收费站出口追尾事故处理完毕。")
-                    .contains("（清障救援）")
-                    .contains("- 拖移故障车辆1辆。")
-                    .contains("三、设施赔补偿情况：\n无")
-                    .contains("七、其他情况：")
-                    .contains("- 与交警联合巡查。");
+                    .contains("日常巡查时间白班16：00-18：00，夜班：22：00-次日1：00巡查期间发现以下问题。")
+                    .contains("一、道路病害或损坏情况：\n路面沉陷处设置警示标志。")
+                    .contains("二、交通事故或清障救援情况：\n收费站出口追尾事故处理完毕；拖移故障车辆1辆。")
+                    .contains("三、设施赔补偿情况：\n无。")
+                    .contains("四、大件或超限车辆检查：\n检查大件运输车辆2辆，手续齐全；劝返超限车辆1辆。")
+                    .contains("五、涉路施工检查：\n无。")
+                    .contains("六、违法侵权事件：\n无。")
+                    .contains("七、其他情况：\n与交警联合巡查。");
 
             String remarkText = readValueRightOfLabel(infoSheet, "备注").replace("\r\n", "\n");
             assertThat(remarkText)

@@ -19,6 +19,7 @@ import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
 import com.xrcgs.iam.model.vo.DeptBriefVO;
 import com.xrcgs.iam.model.vo.RoleBriefVO;
+import com.xrcgs.iam.model.vo.UserSimpleVO;
 import com.xrcgs.iam.model.vo.UserVO;
 import com.xrcgs.iam.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -30,9 +31,12 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,6 +57,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public Page<UserVO> page(UserPageQuery q, long pageNo, long pageSize) {
+        enrichDeptQuery(q);
         Page<SysUser> entityPage = userMapper.selectPage(new Page<>(pageNo, pageSize), q);
         Page<UserVO> result = new Page<>(entityPage.getCurrent(), entityPage.getSize());
         result.setTotal(entityPage.getTotal());
@@ -221,6 +226,150 @@ public class UserServiceImpl implements UserService {
         return vos;
     }
 
+    @Override
+    public List<UserSimpleVO> listEnabledUsersInSameDept(String username, Integer deptLevelOffset) {
+        String normalized = normalize(username);
+        if (!StringUtils.hasText(normalized)) {
+            return Collections.emptyList();
+        }
+
+        SysUser target = userMapper.selectOne(Wrappers.<SysUser>lambdaQuery()
+                .eq(SysUser::getUsername, normalized)
+                .last("limit 1"));
+        if (target == null || target.getDeptId() == null) {
+            return Collections.emptyList();
+        }
+
+        List<Long> targetDeptIds = resolveTargetDeptIds(target.getDeptId(), deptLevelOffset);
+        if (targetDeptIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<SysUser> users = userMapper.selectList(Wrappers.<SysUser>lambdaQuery()
+                .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getGender)
+                .in(SysUser::getDeptId, targetDeptIds)
+                .eq(SysUser::getEnabled, Boolean.TRUE)
+                .orderByAsc(SysUser::getId));
+
+        Map<String, UserSimpleVO> result = new LinkedHashMap<>();
+        if (users != null) {
+            users.stream()
+                    .map(this::toSimpleVO)
+                    .forEach(user -> result.put(user.getUsername(), user));
+        }
+        if (!result.containsKey(target.getUsername())) {
+            result.put(target.getUsername(), toSimpleVO(target));
+        }
+        return new ArrayList<>(result.values());
+    }
+
+    private List<Long> resolveTargetDeptIds(Long currentDeptId, Integer deptLevelOffset) {
+        if (currentDeptId == null) {
+            return Collections.emptyList();
+        }
+        int offset = deptLevelOffset == null ? 0 : deptLevelOffset;
+        if (offset >= 0) {
+            Long upDeptId = resolveUpLevelDeptId(currentDeptId, offset);
+            return resolveDeptAndChildrenIds(upDeptId);
+        }
+        return resolveDownLevelDeptIds(currentDeptId, -offset);
+    }
+
+    private Long resolveUpLevelDeptId(Long currentDeptId, int upLevel) {
+        SysDept currentDept = deptMapper.selectById(currentDeptId);
+        if (currentDept == null || !StringUtils.hasText(currentDept.getPath())) {
+            return currentDeptId;
+        }
+        String[] parts = currentDept.getPath().split("/");
+        List<Long> pathIds = new ArrayList<>();
+        for (String part : parts) {
+            if (!StringUtils.hasText(part)) {
+                continue;
+            }
+            try {
+                pathIds.add(Long.parseLong(part));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (pathIds.isEmpty()) {
+            return currentDeptId;
+        }
+        int index = Math.max(0, pathIds.size() - 1 - upLevel);
+        return pathIds.get(index);
+    }
+
+    private List<Long> resolveDeptAndChildrenIds(Long deptId) {
+        if (deptId == null) {
+            return Collections.emptyList();
+        }
+        SysDept dept = deptMapper.selectById(deptId);
+        if (dept == null || !StringUtils.hasText(dept.getPath())) {
+            return Collections.singletonList(deptId);
+        }
+        List<Long> deptIds = deptMapper.selectIdsByPathPrefix(dept.getPath());
+        if (deptIds == null || deptIds.isEmpty()) {
+            return Collections.singletonList(deptId);
+        }
+        return deptIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private List<Long> resolveDownLevelDeptIds(Long currentDeptId, int downLevel) {
+        if (downLevel <= 0) {
+            return Collections.singletonList(currentDeptId);
+        }
+        List<SysDept> allDepts = deptMapper.selectList(Wrappers.<SysDept>lambdaQuery()
+                .select(SysDept::getId, SysDept::getParentId));
+        if (allDepts == null || allDepts.isEmpty()) {
+            return Collections.singletonList(currentDeptId);
+        }
+
+        Map<Long, List<Long>> childrenMap = new HashMap<>();
+        for (SysDept dept : allDepts) {
+            if (dept == null || dept.getId() == null) {
+                continue;
+            }
+            Long parentId = dept.getParentId() == null ? 0L : dept.getParentId();
+            childrenMap.computeIfAbsent(parentId, k -> new ArrayList<>()).add(dept.getId());
+        }
+
+        Set<Long> currentLevel = new LinkedHashSet<>();
+        currentLevel.add(currentDeptId);
+        for (int i = 0; i < downLevel; i++) {
+            Set<Long> nextLevel = new LinkedHashSet<>();
+            for (Long deptId : currentLevel) {
+                List<Long> children = childrenMap.get(deptId);
+                if (children != null && !children.isEmpty()) {
+                    nextLevel.addAll(children);
+                }
+            }
+            if (nextLevel.isEmpty()) {
+                break;
+            }
+            currentLevel = nextLevel;
+        }
+        return new ArrayList<>(currentLevel);
+    }
+
+    private void enrichDeptQuery(UserPageQuery q) {
+        if (q == null || q.getDeptId() == null) {
+            return;
+        }
+        SysDept dept = deptMapper.selectById(q.getDeptId());
+        if (dept == null || !StringUtils.hasText(dept.getPath())) {
+            q.setDeptIds(Collections.singletonList(q.getDeptId()));
+            return;
+        }
+        List<Long> deptIds = deptMapper.selectIdsByPathPrefix(dept.getPath());
+        if (deptIds == null || deptIds.isEmpty()) {
+            q.setDeptIds(Collections.singletonList(q.getDeptId()));
+            return;
+        }
+        q.setDeptIds(deptIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList()));
+    }
+
     private SysUser requireExisting(Long id) {
         SysUser user = userMapper.selectById(id);
         if (user == null) {
@@ -311,6 +460,14 @@ public class UserServiceImpl implements UserService {
         vo.setRoles(Collections.emptyList());
         vo.setCreatedAt(entity.getCreatedAt());
         vo.setUpdatedAt(entity.getUpdatedAt());
+        return vo;
+    }
+
+    private UserSimpleVO toSimpleVO(SysUser entity) {
+        UserSimpleVO vo = new UserSimpleVO();
+        vo.setUsername(entity.getUsername());
+        vo.setNickname(entity.getNickname());
+        vo.setGender(entity.getGender());
         return vo;
     }
 

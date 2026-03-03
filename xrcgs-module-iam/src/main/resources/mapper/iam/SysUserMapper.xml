@@ -28,7 +28,13 @@
             <if test="q.nickname != null and q.nickname != ''">
                 AND nickname LIKE CONCAT('%', #{q.nickname}, '%')
             </if>
-            <if test="q.deptId != null">
+            <if test="q.deptIds != null and q.deptIds.size() > 0">
+                AND dept_id IN
+                <foreach collection="q.deptIds" item="deptId" open="(" separator="," close=")">
+                    #{deptId}
+                </foreach>
+            </if>
+            <if test="(q.deptIds == null or q.deptIds.size() == 0) and q.deptId != null">
                 AND dept_id = #{q.deptId}
             </if>
             <if test="q.enabled != null">

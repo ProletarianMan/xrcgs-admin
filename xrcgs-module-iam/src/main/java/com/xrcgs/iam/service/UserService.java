@@ -3,6 +3,7 @@ package com.xrcgs.iam.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
+import com.xrcgs.iam.model.vo.UserSimpleVO;
 import com.xrcgs.iam.model.vo.UserVO;
 
 import java.util.List;
@@ -26,5 +27,7 @@ public interface UserService {
     void assignRoles(Long id, List<Long> roleIds);
 
     List<UserVO> listByNicknameSuffix(String nickname);
+
+    List<UserSimpleVO> listEnabledUsersInSameDept(String username, Integer deptLevelOffset);
 }
 

@@ -208,12 +208,9 @@ public class InspectionRecordExcelExporter {
     }
 
     private void fillHandlingSection(Sheet sheet, InspectionRecord record) {
-        // 构建巡查概述+处理情况的正文，按模板顺序组织段落。
         StringBuilder builder = new StringBuilder();
-        builder.append("巡查内容：").append(defaultText(record.getInspectionContent())).append(System.lineSeparator());
-        builder.append("问题描述：").append(defaultText(record.getIssuesFound())).append(System.lineSeparator());
-        builder.append("处理情况（原始记录）：").append(defaultText(record.getHandlingSituationRaw())).append(System.lineSeparator());
-        builder.append("处理情况（分类汇总）：").append(System.lineSeparator());
+        builder.append("日常巡查时间白班16：00-18：00，夜班：22：00-次日1：00巡查期间发现以下问题。")
+                .append(System.lineSeparator());
         builder.append(buildHandlingDetails(record.getHandlingDetails()));
         setCellToRightOfLabel(sheet, "巡查、处理情况", builder.toString().stripTrailing());
     }
@@ -817,55 +814,45 @@ public class InspectionRecordExcelExporter {
     private String buildHandlingDetails(HandlingCategoryGroup group) {
         HandlingCategoryGroup effective = Optional.ofNullable(group).orElseGet(HandlingCategoryGroup::new);
         StringBuilder sb = new StringBuilder();
-        // 分类段落顺序遵循业务要求，保持与模板一致。
-        appendCategory(sb, "一、道路病害或损坏情况", effective.getRoadDamage());
-        appendCompositeCategory(sb, "二、交通事故或清障救援情况",
-                new SubCategory("（交通事故）", effective.getTrafficAccidents()),
-                new SubCategory("（清障救援）", effective.getRoadRescue()));
-        appendCategory(sb, "三、设施赔补偿情况", effective.getFacilityCompensations());
-        appendCompositeCategory(sb, "四、大件或超限车辆检查",
-                new SubCategory("（大件检查）", effective.getLargeVehicleChecks()),
-                new SubCategory("（超限车辆处理）", effective.getOverloadVehicleHandling()));
-        appendCategory(sb, "五、涉路施工检查", effective.getConstructionChecks());
-        appendCategory(sb, "六、违法侵权事件", effective.getIllegalInfringements());
-        appendCategory(sb, "七、其他情况", effective.getOtherMatters());
+        appendCategoryLine(sb, "一、道路病害或损坏情况：", effective.getRoadDamage());
+        appendCategoryLine(sb, "二、交通事故或清障救援情况：",
+                mergeLists(effective.getTrafficAccidents(), effective.getRoadRescue()));
+        appendCategoryLine(sb, "三、设施赔补偿情况：", effective.getFacilityCompensations());
+        appendCategoryLine(sb, "四、大件或超限车辆检查：",
+                mergeLists(effective.getLargeVehicleChecks(), effective.getOverloadVehicleHandling()));
+        appendCategoryLine(sb, "五、涉路施工检查：", effective.getConstructionChecks());
+        appendCategoryLine(sb, "六、违法侵权事件：", effective.getIllegalInfringements());
+        appendCategoryLine(sb, "七、其他情况：", effective.getOtherMatters());
         return sb.toString().stripTrailing();
     }
 
-    private void appendCategory(StringBuilder sb, String header, List<String> items) {
+    private void appendCategoryLine(StringBuilder sb, String header, List<String> items) {
         if (sb.length() > 0) {
             sb.append(System.lineSeparator());
         }
-        sb.append(header).append("：").append(System.lineSeparator());
-        writeItems(sb, items);
+        sb.append(header).append(System.lineSeparator());
+        sb.append(formatItems(items)).append("。");
     }
 
-    private void appendCompositeCategory(StringBuilder sb, String header, SubCategory... subCategories) {
-        if (sb.length() > 0) {
-            sb.append(System.lineSeparator());
-        }
-        sb.append(header).append("：").append(System.lineSeparator());
-        for (int i = 0; i < subCategories.length; i++) {
-            SubCategory sub = subCategories[i];
-            sb.append(sub.title()).append(System.lineSeparator());
-            writeItems(sb, sub.items());
-            if (i < subCategories.length - 1) {
-                sb.append(System.lineSeparator());
-            }
-        }
-    }
-
-    private void writeItems(StringBuilder sb, List<String> items) {
+    private String formatItems(List<String> items) {
         List<String> normalized = Optional.ofNullable(items).orElseGet(Collections::emptyList)
                 .stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
+                .map(this::trimSentenceEnd)
                 .toList();
         if (normalized.isEmpty()) {
-            sb.append("无").append(System.lineSeparator());
-        } else {
-            normalized.forEach(item -> sb.append("- ").append(item).append(System.lineSeparator()));
+            return "无";
         }
+        return String.join("；", normalized);
+    }
+
+    private String trimSentenceEnd(String value) {
+        String trimmed = value.trim();
+        if (trimmed.endsWith("。")) {
+            return trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     private String defaultText(String value) {
@@ -921,6 +908,14 @@ public class InspectionRecordExcelExporter {
     private record ImageResource(byte[] data, int pictureType, int widthPx, int heightPx) {
     }
 
-    private record SubCategory(String title, List<String> items) {
+    private List<String> mergeLists(List<String> first, List<String> second) {
+        List<String> combined = new ArrayList<>();
+        if (first != null) {
+            combined.addAll(first);
+        }
+        if (second != null) {
+            combined.addAll(second);
+        }
+        return combined;
     }
 }

@@ -6,10 +6,12 @@ import com.xrcgs.iam.model.dto.UserAssignRoleDTO;
 import com.xrcgs.iam.model.dto.UserResetPasswordDTO;
 import com.xrcgs.iam.model.dto.UserUpsertDTO;
 import com.xrcgs.iam.model.query.UserPageQuery;
+import com.xrcgs.iam.model.vo.UserSimpleVO;
 import com.xrcgs.iam.model.vo.UserVO;
 import com.xrcgs.iam.service.UserService;
 import com.xrcgs.syslog.annotation.OpLog;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,6 +40,25 @@ public class UserController {
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:list')")
     public R<List<UserVO>> searchByNickname(@RequestParam String nickname) {
         return R.ok(userService.listByNicknameSuffix(nickname));
+    }
+
+    /**
+     * 获取传入用户名的同部门用户
+     * 0：当前部门（与原接口一致，但强制确保结果含本人）
+     * >0：向上找 N 级部门，然后返回该部门及其下属所有部门中的启用用户
+     * 超过顶级时，自动回退到顶级部门范围
+     * <0：向下找 N 级部门（按层级），返回该层级所有部门中的启用用户
+     * 超过最低层时，自动回退到最低可达层级部门范围
+     * 无论本人是否在上述“启用用户查询结果”里，最终结果都会补上本人（去重）
+     * @param username 登录用户用户名
+     * @param deptLevelOffset 上下级寻找
+     * @return 用户
+     */
+    @GetMapping("/same-dept-users")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:user:list')")
+    public R<List<UserSimpleVO>> sameDeptUsers(@RequestParam @NotBlank String username,
+                                               @RequestParam(defaultValue = "0") Integer deptLevelOffset) {
+        return R.ok(userService.listEnabledUsersInSameDept(username, deptLevelOffset));
     }
 
     @GetMapping("/{id}")
