@@ -8,6 +8,7 @@ import com.xrcgs.iam.model.query.DictTypePageQuery;
 import com.xrcgs.iam.model.vo.DictVO;
 
 import java.util.List;
+import java.util.Map;
 
 public interface DictService {
     Long createType(SysDictType type);
@@ -18,22 +19,15 @@ public interface DictService {
     void updateItem(SysDictItem item);
     void removeItem(Long id);
 
-    DictVO getByType(String typeCode); // 带缓存
-    void evictType(String typeCode); // 逐出类型
+    DictVO getByType(String typeCode);
+    DictVO getByType(String typeCode, Long filterDeptId);
+    Map<String, DictVO> getByTypes(List<String> typeCodes, Long filterDeptId);
+    void evictType(String typeCode);
 
-    /**
-     * 全量同步 Redis 字典缓存。
-     */
     void syncAllDictCache();
 
-    /**
-     * 按类型增量刷新 Redis 字典缓存。
-     *
-     * @param typeCode 字典类型编码
-     */
     void syncTypeCache(String typeCode);
 
-    // -------- 新增：字典项分页 --------
     Page<SysDictItem> pageItems(DictItemPageQuery q, long pageNo, long pageSize);
 
     List<SysDictType> listTypes(DictTypePageQuery q);

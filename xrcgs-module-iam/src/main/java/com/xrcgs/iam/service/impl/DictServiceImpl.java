@@ -30,6 +30,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -158,6 +159,48 @@ public class DictServiceImpl implements DictService {
             cacheDictSafely(typeCode, vo);
         }
         return vo;
+    }
+
+    @Override
+    public DictVO getByType(String typeCode, Long filterDeptId) {
+        if (filterDeptId == null) {
+            return getByType(typeCode);
+        }
+        if (!StringUtils.hasText(typeCode)) {
+            return null;
+        }
+        Long userId = userIdProvider.getCurrentUserId();
+        EffectiveDataScope scope = dataScopeManager.getEffectiveDataScope(userId);
+
+        SysDictType t = typeMapper.selectOne(Wrappers.<SysDictType>lambdaQuery()
+                .eq(SysDictType::getCode, typeCode));
+        if (t == null || t.getStatus() == null || t.getStatus() != 1) {
+            return null;
+        }
+
+        LambdaQueryWrapper<SysDictItem> wrapper = Wrappers.<SysDictItem>lambdaQuery()
+                .eq(SysDictItem::getTypeCode, typeCode)
+                .eq(SysDictItem::getStatus, 1)
+                .eq(SysDictItem::getDeptId, filterDeptId);
+        applyDeptScope(wrapper, scope, userId);
+        List<SysDictItem> items = itemMapper.selectList(wrapper);
+        return buildDictVO(t, items);
+    }
+
+    @Override
+    public Map<String, DictVO> getByTypes(List<String> typeCodes, Long filterDeptId) {
+        if (typeCodes == null || typeCodes.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, DictVO> result = new LinkedHashMap<>();
+        for (String rawTypeCode : typeCodes) {
+            String typeCode = rawTypeCode == null ? null : rawTypeCode.trim();
+            if (!StringUtils.hasText(typeCode) || result.containsKey(typeCode)) {
+                continue;
+            }
+            result.put(typeCode, getByType(typeCode, filterDeptId));
+        }
+        return result;
     }
 
     @Override

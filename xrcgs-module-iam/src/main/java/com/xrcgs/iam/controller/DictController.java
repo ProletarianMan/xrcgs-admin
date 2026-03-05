@@ -20,6 +20,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 字典控制器
@@ -121,9 +122,29 @@ public class DictController {
 
     /* ---------- 查询：按 typeCode ---------- */
 
+    /**
+     * 单查询，查询该类型下的所有字典项
+     * @param typeCode 字典类型
+     * @param filterDeptId 字典归属id
+     * @return
+     */
     @GetMapping("/getType/{typeCode}")
     @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:list')")
-    public R<DictVO> getByType(@PathVariable @NotBlank String typeCode) {
-        return R.ok(dictService.getByType(typeCode));
+    public R<DictVO> getByType(@PathVariable @NotBlank String typeCode,
+                               @RequestParam(value = "filterDeptId", required = false) Long filterDeptId) {
+        return R.ok(dictService.getByType(typeCode, filterDeptId));
+    }
+
+    /**
+     * 批量查询字典项
+     * @param typeCodes 字典类型
+     * @param filterDeptId 字典归属id
+     * @return
+     */
+    @GetMapping("/getType")
+    @PreAuthorize("@permChecker.hasPerm(authentication, 'iam:dict:list')")
+    public R<Map<String, DictVO>> getByTypes(@RequestParam("typeCodes") List<String> typeCodes,
+                                             @RequestParam(value = "filterDeptId", required = false) Long filterDeptId) {
+        return R.ok(dictService.getByTypes(typeCodes, filterDeptId));
     }
 }
