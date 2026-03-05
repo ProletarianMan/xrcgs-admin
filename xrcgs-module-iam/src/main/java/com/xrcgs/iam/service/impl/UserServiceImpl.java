@@ -87,7 +87,7 @@ public class UserServiceImpl implements UserService {
     public Long create(UserUpsertDTO dto) {
         String username = normalize(dto.getUsername());
         if (!StringUtils.hasText(username)) {
-            throw new IllegalArgumentException("用户名不能为空");
+            throw new IllegalArgumentException("用户名不能为空?");
         }
         ensureUsernameUnique(username, null);
 
@@ -128,7 +128,7 @@ public class UserServiceImpl implements UserService {
 
         String username = normalize(dto.getUsername());
         if (!StringUtils.hasText(username)) {
-            throw new IllegalArgumentException("用户名不能为空");
+            throw new IllegalArgumentException("用户名不能空?");
         }
         ensureUsernameUnique(username, id);
 
@@ -246,19 +246,29 @@ public class UserServiceImpl implements UserService {
         }
 
         List<SysUser> users = userMapper.selectList(Wrappers.<SysUser>lambdaQuery()
-                .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getGender)
+                .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getGender, SysUser::getDeptId)
                 .in(SysUser::getDeptId, targetDeptIds)
                 .eq(SysUser::getEnabled, Boolean.TRUE)
                 .orderByAsc(SysUser::getId));
 
+        List<Long> deptIds = new ArrayList<>();
+        deptIds.add(target.getDeptId());
+        if (users != null) {
+            users.stream()
+                    .map(SysUser::getDeptId)
+                    .filter(Objects::nonNull)
+                    .forEach(deptIds::add);
+        }
+        Map<Long, SysDept> deptMap = loadDeptMap(deptIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList()));
+
         Map<String, UserSimpleVO> result = new LinkedHashMap<>();
         if (users != null) {
             users.stream()
-                    .map(this::toSimpleVO)
+                    .map(user -> toSimpleVO(user, target.getUsername(), deptMap))
                     .forEach(user -> result.put(user.getUsername(), user));
         }
         if (!result.containsKey(target.getUsername())) {
-            result.put(target.getUsername(), toSimpleVO(target));
+            result.put(target.getUsername(), toSimpleVO(target, target.getUsername(), deptMap));
         }
         return new ArrayList<>(result.values());
     }
@@ -373,7 +383,7 @@ public class UserServiceImpl implements UserService {
     private SysUser requireExisting(Long id) {
         SysUser user = userMapper.selectById(id);
         if (user == null) {
-            throw new IllegalArgumentException("用户不存在: " + id);
+            throw new IllegalArgumentException("用户不存�? " + id);
         }
         return user;
     }
@@ -398,7 +408,7 @@ public class UserServiceImpl implements UserService {
         try {
             return objectMapper.writeValueAsString(sanitized);
         } catch (Exception e) {
-            throw new RuntimeException("JSON 序列化失败", e);
+            throw new RuntimeException("JSON 序列化失?", e);
         }
     }
 
@@ -463,11 +473,15 @@ public class UserServiceImpl implements UserService {
         return vo;
     }
 
-    private UserSimpleVO toSimpleVO(SysUser entity) {
+    private UserSimpleVO toSimpleVO(SysUser entity, String currentUsername, Map<Long, SysDept> deptMap) {
         UserSimpleVO vo = new UserSimpleVO();
         vo.setUsername(entity.getUsername());
         vo.setNickname(entity.getNickname());
         vo.setGender(entity.getGender());
+        vo.setCurrentUser(Objects.equals(entity.getUsername(), currentUsername));
+        vo.setDeptId(entity.getDeptId());
+        SysDept dept = entity.getDeptId() == null ? null : deptMap.get(entity.getDeptId());
+        vo.setDeptName(dept == null ? null : dept.getName());
         return vo;
     }
 
