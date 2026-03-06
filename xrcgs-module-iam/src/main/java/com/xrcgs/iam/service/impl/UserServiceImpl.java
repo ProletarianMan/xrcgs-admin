@@ -248,7 +248,7 @@ public class UserServiceImpl implements UserService {
         List<SysUser> users = userMapper.selectList(Wrappers.<SysUser>lambdaQuery()
                 .select(SysUser::getId, SysUser::getUsername, SysUser::getNickname, SysUser::getGender, SysUser::getDeptId)
                 .in(SysUser::getDeptId, targetDeptIds)
-                .eq(SysUser::getEnabled, Boolean.TRUE)
+                .apply("enabled = 1")
                 .orderByAsc(SysUser::getId));
 
         List<Long> deptIds = new ArrayList<>();
