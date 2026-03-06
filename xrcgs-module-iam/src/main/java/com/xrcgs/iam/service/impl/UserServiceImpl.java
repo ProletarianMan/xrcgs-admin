@@ -87,7 +87,7 @@ public class UserServiceImpl implements UserService {
     public Long create(UserUpsertDTO dto) {
         String username = normalize(dto.getUsername());
         if (!StringUtils.hasText(username)) {
-            throw new IllegalArgumentException("用户名不能为空?");
+            throw new IllegalArgumentException("用户名不能为�?");
         }
         ensureUsernameUnique(username, null);
 
@@ -278,11 +278,21 @@ public class UserServiceImpl implements UserService {
             return Collections.emptyList();
         }
         int offset = deptLevelOffset == null ? 0 : deptLevelOffset;
-        if (offset >= 0) {
+        if (offset == 0) {
+            return Collections.singletonList(currentDeptId);
+        }
+        if (offset > 0) {
             Long upDeptId = resolveUpLevelDeptId(currentDeptId, offset);
             return resolveDeptAndChildrenIds(upDeptId);
         }
-        return resolveDownLevelDeptIds(currentDeptId, -offset);
+
+        List<Long> downLevelDeptIds = resolveDownLevelDeptIds(currentDeptId, -offset);
+        LinkedHashSet<Long> mergedDeptIds = new LinkedHashSet<>();
+        mergedDeptIds.add(currentDeptId);
+        if (downLevelDeptIds != null) {
+            mergedDeptIds.addAll(downLevelDeptIds);
+        }
+        return new ArrayList<>(mergedDeptIds);
     }
 
     private Long resolveUpLevelDeptId(Long currentDeptId, int upLevel) {
@@ -383,7 +393,7 @@ public class UserServiceImpl implements UserService {
     private SysUser requireExisting(Long id) {
         SysUser user = userMapper.selectById(id);
         if (user == null) {
-            throw new IllegalArgumentException("用户不存�? " + id);
+            throw new IllegalArgumentException("用户不存�? " + id);
         }
         return user;
     }
@@ -606,4 +616,5 @@ public class UserServiceImpl implements UserService {
         }
     }
 }
+
 
