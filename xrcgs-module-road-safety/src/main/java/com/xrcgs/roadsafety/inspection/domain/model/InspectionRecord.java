@@ -135,4 +135,13 @@ public class InspectionRecord {
      */
     @TableField("export_file_name")
     private String exportFileName;
+
+    @TableField("form_payload_json")
+    private String formPayloadJson;
+
+    @TableField("details_payload_json")
+    private String detailsPayloadJson;
+
+    @TableField("summary_payload_json")
+    private String summaryPayloadJson;
 }

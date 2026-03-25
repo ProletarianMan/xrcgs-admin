@@ -68,6 +68,9 @@ CREATE TABLE "public"."road_inspection_record" (
   "exported_by" varchar(64) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "exported_at" timestamp(6),
   "export_file_name" varchar(255) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
+  "form_payload_json" text COLLATE "pg_catalog"."default",
+  "details_payload_json" text COLLATE "pg_catalog"."default",
+  "summary_payload_json" text COLLATE "pg_catalog"."default",
   "approval_status" varchar(32) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'UNSUBMITTED'::character varying,
   "squad_code" varchar(64) COLLATE "pg_catalog"."default" NOT NULL
 )

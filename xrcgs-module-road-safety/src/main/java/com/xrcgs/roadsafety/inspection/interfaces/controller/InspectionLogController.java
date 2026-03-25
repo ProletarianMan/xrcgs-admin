@@ -1,16 +1,24 @@
 package com.xrcgs.roadsafety.inspection.interfaces.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogApplicationService;
+import com.xrcgs.roadsafety.inspection.application.service.InspectionLogSubmitExportService;
+import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitRequest;
 import com.xrcgs.syslog.annotation.OpLog;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,9 +28,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * 巡查日志导出接口，接收前端提交的巡查数据并返回生成的 Excel 文件。
- */
 @RestController
 @RequestMapping("/api/road-safety/inspection/logs")
 @RequiredArgsConstructor
@@ -32,18 +37,31 @@ public class InspectionLogController {
     private static final Logger log = LoggerFactory.getLogger(InspectionLogController.class);
 
     private final InspectionLogApplicationService applicationService;
+    private final InspectionLogSubmitExportService submitExportService;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
 
-    /**
-     * 生成巡查日志 Excel 文件并以附件形式返回。
-     *
-     * @param request  巡查日志提交数据
-     * @param response HTTP 响应对象
-     */
     @PostMapping("/export")
-    @OpLog("生成巡查日志")
+    @OpLog("导出巡查日志")
     public void export(@Valid @RequestBody InspectionLogSubmitRequest request,
                        HttpServletResponse response) throws IOException {
         Path exportFile = applicationService.generateInspectionLog(request);
+        streamFile(exportFile, response);
+    }
+
+    @PostMapping("/submit-export")
+    @OpLog("提交导出巡查日志")
+    public void submitExport(@RequestBody JsonNode payload, HttpServletResponse response) throws IOException {
+        InspectionLogSubmitExportRequest request = objectMapper.treeToValue(payload, InspectionLogSubmitExportRequest.class);
+        Set<ConstraintViolation<InspectionLogSubmitExportRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        Path exportFile = submitExportService.submitAndExport(request, payload);
+        streamFile(exportFile, response);
+    }
+
+    private void streamFile(Path exportFile, HttpServletResponse response) throws IOException {
         try (InputStream inputStream = Files.newInputStream(exportFile)) {
             String fileName = exportFile.getFileName().toString();
             String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
@@ -57,7 +75,7 @@ public class InspectionLogController {
             inputStream.transferTo(response.getOutputStream());
             response.flushBuffer();
         } catch (IOException ex) {
-            log.error("巡查日志导出失败", ex);
+            log.error("inspection log export failed", ex);
             throw ex;
         }
     }
