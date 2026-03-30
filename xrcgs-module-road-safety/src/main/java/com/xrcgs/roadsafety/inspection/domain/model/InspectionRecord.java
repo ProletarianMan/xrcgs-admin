@@ -63,6 +63,36 @@ public class InspectionRecord {
     private String location;
 
     /**
+     * 导出展示用巡查路段文本，不落库。
+     */
+    @TableField(exist = false)
+    private String routeDisplay;
+
+    /**
+     * 导出展示用巡查里程文本，不落库。
+     */
+    @TableField(exist = false)
+    private String mileageDisplay;
+
+    /**
+     * 导出展示用交班人文本，不落库。
+     */
+    @TableField(exist = false)
+    private String handoverFromDisplay;
+
+    /**
+     * 导出展示用接班人文本，不落库。
+     */
+    @TableField(exist = false)
+    private String handoverToDisplay;
+
+    /**
+     * 导出展示用送达联系单文本，不落库。
+     */
+    @TableField(exist = false)
+    private String deliveryContactDisplay;
+
+    /**
      * 巡查内容概述。
      */
     @TableField("inspection_content")

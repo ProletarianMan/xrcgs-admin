@@ -28,11 +28,14 @@ import java.util.Objects;
 import java.util.Optional;
 import javax.imageio.ImageIO;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.CreationHelper;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -190,9 +193,15 @@ public class InspectionRecordExcelExporter {
         setCellToRightOfLabel(sheet, "天气情况", defaultText(record.getWeather()));
         setCellToRightOfLabel(sheet, "巡查人员", defaultText(record.getPatrolTeam()));
         setCellToRightOfLabel(sheet, "巡查车辆", defaultText(record.getPatrolVehicle()));
-        setCellToRightOfLabel(sheet, "巡查里程", defaultText(record.getLocation()));
-        setCellToRightOfLabel(sheet, "巡查路段", defaultText(record.getLocation()));
+        setCellToRightOfLabel(sheet, "巡查里程", defaultText(preferDisplay(record.getMileageDisplay(), record.getLocation())));
+        setCellToRightOfLabel(sheet, "巡查路段", defaultText(preferDisplay(record.getRouteDisplay(), record.getLocation())));
         setCellToRightOfLabel(sheet, "巡查车辆、装备、案件等交接情况", defaultText(record.getHandoverSummary()));
+        setFixedCellTopCenter(sheet, 8, 1, normalizeDisplay(record.getHandoverFromDisplay())); // B9 交班人
+        setFixedCellTopCenter(sheet, 8, 3, normalizeDisplay(record.getHandoverToDisplay()));   // D9 接班人
+        String deliveryText = StringUtils.trimLeadingWhitespace(record.getDeliveryContactDisplay());
+        if (StringUtils.hasText(deliveryText)) {
+            setFixedCellTopLeft(sheet, 10, 0, deliveryText); // A11
+        }
     }
 
     private void setCellValue(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
@@ -207,6 +216,48 @@ public class InspectionRecordExcelExporter {
         row.setHeightInPoints(height);
     }
 
+    private void setFixedCellTopCenter(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
+        XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+        applyTopCenterAlignment(sheet.getWorkbook(), cell);
+    }
+
+    private void setFixedCellTopLeft(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
+        XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+        applyTopLeftAlignment(sheet.getWorkbook(), cell);
+    }
+
+    private void applyTopCenterAlignment(Workbook workbook, Cell cell) {
+        if (workbook == null || cell == null) {
+            return;
+        }
+        CellStyle style = workbook.createCellStyle();
+        CellStyle base = cell.getCellStyle();
+        if (base != null) {
+            style.cloneStyleFrom(base);
+        }
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.TOP);
+        cell.setCellStyle(style);
+    }
+
+    private void applyTopLeftAlignment(Workbook workbook, Cell cell) {
+        if (workbook == null || cell == null) {
+            return;
+        }
+        CellStyle style = workbook.createCellStyle();
+        CellStyle base = cell.getCellStyle();
+        if (base != null) {
+            style.cloneStyleFrom(base);
+        }
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.TOP);
+        cell.setCellStyle(style);
+    }
+
     private void fillHandlingSection(Sheet sheet, InspectionRecord record) {
         StringBuilder builder = new StringBuilder();
         builder.append("日常巡查时间白班16：00-18：00，夜班：22：00-次日1：00巡查期间发现以下问题。")
@@ -216,8 +267,7 @@ public class InspectionRecordExcelExporter {
     }
 
     private void fillRemarks(Sheet sheet, InspectionRecord record) {
-        String remark = buildRemark(record);
-        setCellToRightOfLabel(sheet, "备注", remark);
+        setCellToRightOfLabel(sheet, "备注", normalizeDisplay(record.getRemark()));
     }
 
     private void fillAuditTrail(XSSFSheet sheet, InspectionRecord record) {
@@ -250,45 +300,6 @@ public class InspectionRecordExcelExporter {
 
     private String normalizeAuditValue(String value) {
         return StringUtils.hasText(value) ? value.trim() : "";
-    }
-
-    private String buildRemark(InspectionRecord record) {
-        List<String> lines = new ArrayList<>();
-        if (StringUtils.hasText(record.getRemark())) {
-            lines.add(record.getRemark().trim());
-        }
-        if (StringUtils.hasText(record.getCreatedBy()) || record.getCreatedAt() != null) {
-            lines.add("创建：" + buildNameWithTime(record.getCreatedBy(), record.getCreatedAt()));
-        }
-        if (record.getUpdatedAt() != null) {
-            lines.add("最后更新时间：" + DATE_TIME_FORMATTER.format(record.getUpdatedAt()));
-        }
-        if (StringUtils.hasText(record.getExportedBy()) || record.getExportedAt() != null) {
-            lines.add("导出：" + buildNameWithTime(record.getExportedBy(), record.getExportedAt()));
-        }
-        if (StringUtils.hasText(record.getExportFileName())) {
-            lines.add("导出文件：" + ensureExcelExtension(record.getExportFileName()));
-        }
-        if (lines.isEmpty()) {
-            lines.add("无");
-        }
-        return String.join(System.lineSeparator(), lines);
-    }
-
-    private String buildNameWithTime(String name, LocalDateTime time) {
-        StringBuilder builder = new StringBuilder();
-        String normalizedName = normalizeAuditValue(name);
-        if (StringUtils.hasText(normalizedName)) {
-            builder.append(normalizedName);
-        }
-        String formattedTime = formatDateTime(time);
-        if (StringUtils.hasText(formattedTime)) {
-            if (builder.length() > 0) {
-                builder.append(" ");
-            }
-            builder.append("(").append(formattedTime).append(")");
-        }
-        return builder.length() == 0 ? "无" : builder.toString();
     }
 
     private void writePhotos(XSSFWorkbook workbook, List<PhotoItem> photos) {
@@ -831,7 +842,7 @@ public class InspectionRecordExcelExporter {
             sb.append(System.lineSeparator());
         }
         sb.append(header).append(System.lineSeparator());
-        sb.append(formatItems(items)).append("。");
+        sb.append(formatItems(items));
     }
 
     private String formatItems(List<String> items) {
@@ -839,24 +850,33 @@ public class InspectionRecordExcelExporter {
                 .stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
-                .map(this::trimSentenceEnd)
                 .toList();
         if (normalized.isEmpty()) {
             return "无";
         }
-        return String.join("；", normalized);
-    }
-
-    private String trimSentenceEnd(String value) {
-        String trimmed = value.trim();
-        if (trimmed.endsWith("。")) {
-            return trimmed.substring(0, trimmed.length() - 1);
+        if (normalized.size() == 1) {
+            return normalized.get(0);
         }
-        return trimmed;
+        List<String> numberedLines = new ArrayList<>();
+        for (int i = 0; i < normalized.size(); i++) {
+            numberedLines.add((i + 1) + "." + normalized.get(i));
+        }
+        return String.join(System.lineSeparator(), numberedLines);
     }
 
     private String defaultText(String value) {
         return StringUtils.hasText(value) ? value.trim() : "无";
+    }
+
+    private String preferDisplay(String displayValue, String fallbackValue) {
+        if (StringUtils.hasText(displayValue)) {
+            return displayValue.trim();
+        }
+        return fallbackValue;
+    }
+
+    private String normalizeDisplay(String value) {
+        return StringUtils.hasText(value) ? value.trim() : "";
     }
 
     private String formatDate(LocalDate date) {

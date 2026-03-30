@@ -20,8 +20,10 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
@@ -80,6 +82,9 @@ class InspectionRecordExcelExporterTest {
                 .handlingSituationRaw("现场设置警戒并安排抢修。")
                 .handlingDetails(categoryGroup)
                 .handoverSummary("交接巡查车辆与装备完毕。")
+                .handoverFromDisplay("张三、李四")
+                .handoverToDisplay("王五")
+                .deliveryContactDisplay("送达2026-001号《工作联系单》\n被送达单位：交警大队")
                 .photos(photos)
                 .remark("现场秩序良好。")
                 .createdBy("张三")
@@ -117,6 +122,15 @@ class InspectionRecordExcelExporterTest {
             assertThat(handoverText)
                     .startsWith("巡查车辆、装备、案件等交接情况：")
                     .contains("交接巡查车辆与装备完毕。");
+            assertThat(getCellString(infoSheet, 8, 1)).isEqualTo("张三、李四");
+            assertThat(getCellString(infoSheet, 8, 3)).isEqualTo("王五");
+            String deliveryText = getCellString(infoSheet, 10, 0).replace("\r\n", "\n");
+            assertThat(deliveryText)
+                    .startsWith("送达2026-001号《工作联系单》")
+                    .contains("被送达单位：交警大队");
+            Cell deliveryCell = infoSheet.getRow(10).getCell(0);
+            assertThat(deliveryCell.getCellStyle().getVerticalAlignment()).isEqualTo(VerticalAlignment.TOP);
+            assertThat(deliveryCell.getCellStyle().getAlignment()).isEqualTo(HorizontalAlignment.LEFT);
 
             String handlingText = readValueRightOfLabel(infoSheet, "巡查、处理情况");
             String normalizedHandling = handlingText.replace("\r\n", "\n");
@@ -124,20 +138,17 @@ class InspectionRecordExcelExporterTest {
                     .startsWith("巡查、处理情况：")
                     .contains("日常巡查时间白班16：00-18：00，夜班：22：00-次日1：00巡查期间发现以下问题。")
                     .contains("一、道路病害或损坏情况：\n路面沉陷处设置警示标志。")
-                    .contains("二、交通事故或清障救援情况：\n收费站出口追尾事故处理完毕；拖移故障车辆1辆。")
-                    .contains("三、设施赔补偿情况：\n无。")
-                    .contains("四、大件或超限车辆检查：\n检查大件运输车辆2辆，手续齐全；劝返超限车辆1辆。")
-                    .contains("五、涉路施工检查：\n无。")
-                    .contains("六、违法侵权事件：\n无。")
+                    .contains("二、交通事故或清障救援情况：\n1.收费站出口追尾事故处理完毕。\n2.拖移故障车辆1辆。")
+                    .contains("三、设施赔补偿情况：\n无")
+                    .contains("四、大件或超限车辆检查：\n1.检查大件运输车辆2辆，手续齐全。\n2.劝返超限车辆1辆。")
+                    .contains("五、涉路施工检查：\n无")
+                    .contains("六、违法侵权事件：\n无")
                     .contains("七、其他情况：\n与交警联合巡查。");
 
             String remarkText = readValueRightOfLabel(infoSheet, "备注").replace("\r\n", "\n");
             assertThat(remarkText)
                     .startsWith("备注：")
-                    .contains("现场秩序良好。")
-                    .contains("创建：张三 (2024年12月01日 09:30)")
-                    .contains("最后更新时间：2024年12月01日 18:00")
-                    .contains("导出：李四 (2024年12月01日 18:30)");
+                    .isEqualTo("备注：\n现场秩序良好。");
 
             boolean auditFound = false;
             for (Row row : infoSheet) {
@@ -288,5 +299,17 @@ class InspectionRecordExcelExporterTest {
         }
         String trimmed = text.trim();
         return trimmed.endsWith("：") && !trimmed.contains("\n") && !trimmed.contains("\r");
+    }
+
+    private String getCellString(Sheet sheet, int rowIndex, int columnIndex) {
+        Row row = sheet.getRow(rowIndex);
+        if (row == null) {
+            return "";
+        }
+        Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) {
+            return "";
+        }
+        return cell.getStringCellValue();
     }
 }

@@ -115,6 +115,7 @@ public class InspectionLogApplicationService {
                 .handlingSituationRaw(handlingRaw)
                 .handlingDetails(categoryGroup)
                 .handoverSummary(handoverSummary)
+                .deliveryContactDisplay(buildDeliveryContactDisplay(request.getDeliveries()))
                 .photos(photos)
                 .remark(remark)
                 .createdBy(inspectorNames)
@@ -124,6 +125,28 @@ public class InspectionLogApplicationService {
                 .exportedAt(now)
                 .exportFileName(determineExportFileName(request, inspectionDate))
                 .build();
+    }
+
+    private String buildDeliveryContactDisplay(List<ContactDelivery> deliveries) {
+        if (CollectionUtils.isEmpty(deliveries)) {
+            return null;
+        }
+        List<String> blocks = new ArrayList<>();
+        for (ContactDelivery delivery : deliveries) {
+            if (delivery == null) {
+                continue;
+            }
+            String number = StringUtils.hasText(delivery.getNumber()) ? delivery.getNumber().trim() : "";
+            String unit = StringUtils.hasText(delivery.getUnit()) ? delivery.getUnit().trim() : "";
+            if (!StringUtils.hasText(number) && !StringUtils.hasText(unit)) {
+                continue;
+            }
+            blocks.add("送达" + number + "号《工作联系单》" + System.lineSeparator() + "被送达单位：" + unit);
+        }
+        if (blocks.isEmpty()) {
+            return null;
+        }
+        return String.join(System.lineSeparator(), blocks);
     }
 
     private LocalDate parseDate(String dateText) {
@@ -267,48 +290,7 @@ public class InspectionLogApplicationService {
     }
 
     private String buildRemark(InspectionLogSubmitRequest request) {
-        List<String> remarkLines = new ArrayList<>();
-        if (StringUtils.hasText(request.getRemark())) {
-            remarkLines.add(request.getRemark().trim());
-        }
-        Optional.ofNullable(request.getHandover())
-                .map(HandoverInfo::getRemark)
-                .filter(StringUtils::hasText)
-                .ifPresent(value -> remarkLines.add("交接备注：" + value.trim()));
-        if (!CollectionUtils.isEmpty(request.getDeliveries())) {
-            String deliveries = request.getDeliveries().stream()
-                    .filter(Objects::nonNull)
-                    .map(this::formatDelivery)
-                    .filter(StringUtils::hasText)
-                    .collect(Collectors.joining("；"));
-            if (StringUtils.hasText(deliveries)) {
-                remarkLines.add("送达联系单：" + deliveries);
-            }
-        }
-        if (Boolean.TRUE.equals(request.getDraft())) {
-            remarkLines.add("当前记录为草稿，尚未正式提交审批。");
-        }
-        return joinLines(remarkLines);
-    }
-
-    private String formatDelivery(ContactDelivery delivery) {
-        List<String> parts = new ArrayList<>();
-        if (delivery == null) {
-            return null;
-        }
-        if (StringUtils.hasText(delivery.getUnit())) {
-            parts.add(delivery.getUnit().trim());
-        }
-        if (StringUtils.hasText(delivery.getNumber())) {
-            parts.add("编号：" + delivery.getNumber().trim());
-        }
-        if (StringUtils.hasText(delivery.getDate())) {
-            parts.add("日期：" + delivery.getDate().trim());
-        }
-        if (StringUtils.hasText(delivery.getRemark())) {
-            parts.add(delivery.getRemark().trim());
-        }
-        return parts.isEmpty() ? null : String.join("，", parts);
+        return StringUtils.hasText(request.getRemark()) ? request.getRemark().trim() : null;
     }
 
     private String buildHandoverSummary(HandoverInfo handover) {

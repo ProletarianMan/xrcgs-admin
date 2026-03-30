@@ -3,7 +3,10 @@ package com.xrcgs.syslog.util;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.*;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
@@ -44,7 +47,10 @@ public final class LogJsonUtils {
 
     public static boolean isFilteredArg(Object arg) {
         if (arg == null) return true;
+        if (arg instanceof ServletRequest) return true;
+        if (arg instanceof ServletResponse) return true;
         if (arg instanceof HttpServletRequest) return true;
+        if (arg instanceof HttpServletResponse) return true;
         if (arg instanceof MultipartFile) return true;
         if (arg instanceof InputStream) return true;
         if (arg instanceof OutputStream) return true;
