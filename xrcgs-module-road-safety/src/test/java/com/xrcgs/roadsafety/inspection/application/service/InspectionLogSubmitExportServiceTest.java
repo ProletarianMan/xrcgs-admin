@@ -11,14 +11,18 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.iam.model.vo.DictVO;
 import com.xrcgs.iam.service.DictService;
 import com.xrcgs.roadsafety.inspection.application.dto.CanonicalInspectionExportModel;
+import com.xrcgs.roadsafety.inspection.application.dto.CanonicalInspectionExportModel.CanonicalDetail;
+import com.xrcgs.roadsafety.inspection.application.dto.CanonicalInspectionExportModel.CanonicalDetailType;
 import com.xrcgs.roadsafety.inspection.application.mapper.InspectionLogSubmitExportMapper;
 import com.xrcgs.roadsafety.inspection.config.InspectionLogProperties;
 import com.xrcgs.roadsafety.inspection.domain.model.HandlingCategoryGroup;
 import com.xrcgs.roadsafety.inspection.domain.model.InspectionRecord;
+import com.xrcgs.roadsafety.inspection.domain.model.PhotoItem;
 import com.xrcgs.roadsafety.inspection.infrastructure.mapper.InspectionHandlingDetailMapper;
 import com.xrcgs.roadsafety.inspection.infrastructure.mapper.InspectionPhotoMapper;
 import com.xrcgs.roadsafety.inspection.infrastructure.mapper.InspectionRecordMapper;
@@ -41,6 +45,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 @ExtendWith(MockitoExtension.class)
 class InspectionLogSubmitExportServiceTest {
@@ -175,6 +180,69 @@ class InspectionLogSubmitExportServiceTest {
         verify(recordMapper, never()).insert(any(InspectionRecord.class));
     }
 
+    @Test
+    void shouldOverwriteExistingRecordForSameDateAndTeam() throws Exception {
+        InspectionLogSubmitExportRequest request = buildRequest();
+        JsonNode rawPayload = objectMapper.readTree("{\"details\":[{\"type\":\"OTHER\",\"summaryText\":\"new\"}]}");
+        CanonicalInspectionExportModel canonical = buildCanonicalWithOneDetailAndPhoto();
+        Path exported = tempDir.resolve("submit-export-overwrite.xlsx");
+        Files.writeString(exported, "ok");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(200L);
+        existing.setDate(LocalDate.of(2026, 3, 30));
+        existing.setSquadCode("TEAM_01");
+
+        when(mapper.toCanonical(request, rawPayload)).thenReturn(canonical);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+        when(authCacheService.getCachedDict(any())).thenReturn(null);
+        when(dictService.getByTypes(anyList(), isNull())).thenReturn(fullDictMap());
+        when(recordMapper.selectList(any())).thenReturn(List.of(existing));
+        when(recordMapper.updateById(any(InspectionRecord.class))).thenReturn(1);
+        when(excelExporter.export(any(InspectionRecord.class), any(Path.class))).thenReturn(exported);
+
+        Path result = service.submitAndExport(request, rawPayload);
+
+        assertThat(result).isEqualTo(exported);
+        verify(recordMapper, never()).insert(any(InspectionRecord.class));
+        verify(recordMapper).updateById(any(InspectionRecord.class));
+        verify(detailMapper).delete(any());
+        verify(photoMapper).delete(any());
+        verify(detailMapper).insert(any());
+        verify(photoMapper).insert(any());
+    }
+
+    @Test
+    void shouldFallbackToOverwriteWhenConcurrentInsertHitsUniqueConstraint() throws Exception {
+        InspectionLogSubmitExportRequest request = buildRequest();
+        JsonNode rawPayload = objectMapper.readTree("{\"details\":[{\"type\":\"OTHER\",\"summaryText\":\"new\"}]}");
+        CanonicalInspectionExportModel canonical = buildCanonicalWithOneDetailAndPhoto();
+        Path exported = tempDir.resolve("submit-export-race.xlsx");
+        Files.writeString(exported, "ok");
+
+        InspectionRecord latest = new InspectionRecord();
+        latest.setId(300L);
+        latest.setDate(LocalDate.of(2026, 3, 30));
+        latest.setSquadCode("TEAM_01");
+
+        when(mapper.toCanonical(request, rawPayload)).thenReturn(canonical);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+        when(authCacheService.getCachedDict(any())).thenReturn(null);
+        when(dictService.getByTypes(anyList(), isNull())).thenReturn(fullDictMap());
+        when(recordMapper.selectList(any())).thenReturn(Collections.emptyList(), List.of(latest));
+        when(recordMapper.insert(any(InspectionRecord.class))).thenThrow(new DuplicateKeyException("duplicate"));
+        when(recordMapper.updateById(any(InspectionRecord.class))).thenReturn(1);
+        when(excelExporter.export(any(InspectionRecord.class), any(Path.class))).thenReturn(exported);
+
+        Path result = service.submitAndExport(request, rawPayload);
+
+        assertThat(result).isEqualTo(exported);
+        verify(recordMapper).insert(any(InspectionRecord.class));
+        verify(recordMapper).updateById(any(InspectionRecord.class));
+        verify(detailMapper).delete(any());
+        verify(photoMapper).delete(any());
+    }
+
     private InspectionLogSubmitExportRequest buildRequest() {
         InspectionLogSubmitExportRequest request = new InspectionLogSubmitExportRequest();
         request.setDate("2026-03-30");
@@ -242,6 +310,47 @@ class InspectionLogSubmitExportServiceTest {
                 .draft(false)
                 .photos(Collections.emptyList())
                 .details(Collections.emptyList())
+                .build();
+    }
+
+    private CanonicalInspectionExportModel buildCanonicalWithOneDetailAndPhoto() {
+        ObjectNode rawDetail = objectMapper.createObjectNode();
+        rawDetail.put("type", "OTHER");
+        rawDetail.put("summaryText", "new");
+
+        CanonicalDetail detail = CanonicalDetail.builder()
+                .categoryCode("OTHER")
+                .categoryName("OTHER")
+                .type(CanonicalDetailType.OTHER)
+                .summaryText("new")
+                .rawPayload(rawDetail)
+                .detailOrder(1)
+                .build();
+
+        PhotoItem photo = PhotoItem.builder()
+                .fileId(123L)
+                .description("p")
+                .sortOrder(1)
+                .build();
+
+        return CanonicalInspectionExportModel.builder()
+                .date(LocalDate.of(2026, 3, 30))
+                .teamCode("TEAM_01")
+                .unitName("U1")
+                .weather("W1")
+                .patrolTeam("inspectorA")
+                .patrolVehicle("V1")
+                .location("S1")
+                .inspectionContent("inspection content")
+                .issuesFound("issues")
+                .handlingSituationRaw("handling")
+                .handlingGroup(new HandlingCategoryGroup())
+                .handoverSummary("handover")
+                .remark("remark")
+                .exportFileName("submit-export.xlsx")
+                .draft(false)
+                .photos(List.of(photo))
+                .details(List.of(detail))
                 .build();
     }
 

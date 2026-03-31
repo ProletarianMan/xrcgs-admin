@@ -37,6 +37,7 @@ CREATE TABLE `road_inspection_record` (
   PRIMARY KEY (`id`),
   KEY `idx_record_date` (`record_date`),
   KEY `idx_squad_code` (`squad_code`),
+  UNIQUE KEY `uk_record_date_squad_code` (`record_date`, `squad_code`),
   KEY `idx_created_by` (`created_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='路产安全巡查记录';
 

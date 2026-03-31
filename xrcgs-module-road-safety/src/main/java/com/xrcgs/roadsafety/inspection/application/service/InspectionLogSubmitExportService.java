@@ -1,5 +1,7 @@
 package com.xrcgs.roadsafety.inspection.application.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,6 +28,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -35,6 +38,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -68,7 +72,9 @@ public class InspectionLogSubmitExportService {
     public Path submitAndExport(InspectionLogSubmitExportRequest request, JsonNode rawPayload) throws IOException {
         CanonicalInspectionExportModel canonical = mapper.toCanonical(request, rawPayload);
         LocalDateTime now = LocalDateTime.now();
+        InspectionRecord existingRecord = findLatestByDateAndSquad(canonical.getDate(), canonical.getTeamCode());
         InspectionRecord persistenceRecord = InspectionRecord.builder()
+                .id(existingRecord == null ? null : existingRecord.getId())
                 .date(canonical.getDate())
                 .unitName(canonical.getUnitName())
                 .weather(canonical.getWeather())
@@ -82,8 +88,8 @@ public class InspectionLogSubmitExportService {
                 .photos(Optional.ofNullable(canonical.getPhotos()).orElse(Collections.emptyList()))
                 .handoverSummary(canonical.getHandoverSummary())
                 .remark(canonical.getRemark())
-                .createdBy(canonical.getPatrolTeam())
-                .createdAt(now)
+                .createdBy(resolveCreatedBy(existingRecord, canonical.getPatrolTeam()))
+                .createdAt(resolveCreatedAt(existingRecord, now))
                 .updatedAt(now)
                 .exportedBy(canonical.getPatrolTeam())
                 .exportedAt(now)
@@ -103,10 +109,62 @@ public class InspectionLogSubmitExportService {
             throw new IOException("检查导出文件未生成!");
         }
 
-        recordMapper.insert(persistenceRecord);
+        if (existingRecord == null) {
+            try {
+                recordMapper.insert(persistenceRecord);
+            } catch (DuplicateKeyException ex) {
+                InspectionRecord latestRecord = findLatestByDateAndSquad(canonical.getDate(), canonical.getTeamCode());
+                if (latestRecord == null || latestRecord.getId() == null) {
+                    throw ex;
+                }
+                persistenceRecord.setId(latestRecord.getId());
+                persistenceRecord.setCreatedBy(resolveCreatedBy(latestRecord, canonical.getPatrolTeam()));
+                persistenceRecord.setCreatedAt(resolveCreatedAt(latestRecord, now));
+                overwriteExistingRecord(persistenceRecord);
+            }
+        } else {
+            overwriteExistingRecord(persistenceRecord);
+        }
         saveDetailRows(persistenceRecord.getId(), canonical.getDetails(), now);
         savePhotoRows(persistenceRecord.getId(), canonical.getPhotos(), now);
         return exported;
+    }
+
+    private void overwriteExistingRecord(InspectionRecord persistenceRecord) {
+        int updated = recordMapper.updateById(persistenceRecord);
+        if (updated <= 0) {
+            throw new IllegalStateException("inspection record overwrite failed: no row updated");
+        }
+        deleteDetailRows(persistenceRecord.getId());
+        deletePhotoRows(persistenceRecord.getId());
+    }
+
+    private InspectionRecord findLatestByDateAndSquad(LocalDate date, String squadCode) {
+        if (date == null || !StringUtils.hasText(squadCode)) {
+            return null;
+        }
+        LambdaQueryWrapper<InspectionRecord> query = new LambdaQueryWrapper<InspectionRecord>()
+                .eq(InspectionRecord::getDate, date)
+                .eq(InspectionRecord::getSquadCode, squadCode.trim())
+                .orderByDesc(InspectionRecord::getUpdatedAt)
+                .orderByDesc(InspectionRecord::getId)
+                .last("LIMIT 1");
+        List<InspectionRecord> records = recordMapper.selectList(query);
+        return records == null || records.isEmpty() ? null : records.get(0);
+    }
+
+    private String resolveCreatedBy(InspectionRecord existingRecord, String fallbackCreatedBy) {
+        if (existingRecord != null && StringUtils.hasText(existingRecord.getCreatedBy())) {
+            return existingRecord.getCreatedBy();
+        }
+        return fallbackCreatedBy;
+    }
+
+    private LocalDateTime resolveCreatedAt(InspectionRecord existingRecord, LocalDateTime now) {
+        if (existingRecord != null && existingRecord.getCreatedAt() != null) {
+            return existingRecord.getCreatedAt();
+        }
+        return now;
     }
 
     private InspectionRecord buildExportRecord(CanonicalInspectionExportModel canonical,
@@ -370,6 +428,14 @@ public class InspectionLogSubmitExportService {
         }
     }
 
+    private void deleteDetailRows(Long recordId) {
+        if (recordId == null) {
+            return;
+        }
+        detailMapper.delete(Wrappers.lambdaQuery(InspectionHandlingDetail.class)
+                .eq(InspectionHandlingDetail::getRecordId, recordId));
+    }
+
     private void savePhotoRows(Long recordId, List<PhotoItem> photos, LocalDateTime now) {
         if (recordId == null || photos == null) {
             return;
@@ -387,6 +453,14 @@ public class InspectionLogSubmitExportService {
                     .build();
             photoMapper.insert(entity);
         }
+    }
+
+    private void deletePhotoRows(Long recordId) {
+        if (recordId == null) {
+            return;
+        }
+        photoMapper.delete(Wrappers.lambdaQuery(PhotoItem.class)
+                .eq(PhotoItem::getRecordId, recordId));
     }
 
     private String writeJson(JsonNode payload) {

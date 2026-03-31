@@ -90,6 +90,10 @@ ALTER TABLE "public"."road_inspection_photo" ADD CONSTRAINT "road_inspection_pho
 -- Primary Key structure for table road_inspection_record
 -- ----------------------------
 ALTER TABLE "public"."road_inspection_record" ADD CONSTRAINT "road_inspection_record_pkey" PRIMARY KEY ("id");
+CREATE UNIQUE INDEX "uk_record_date_squad_code" ON "public"."road_inspection_record" USING btree (
+  "record_date" "pg_catalog"."date_ops" ASC NULLS LAST,
+  "squad_code" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
+);
 
 -- ----------------------------
 -- Foreign Keys structure for table road_inspection_handling_detail
