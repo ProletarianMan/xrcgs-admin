@@ -32,6 +32,7 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.CreationHelper;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -73,6 +74,12 @@ public class InspectionRecordExcelExporter {
     private static final double PHOTO_HEIGHT_CM = 10.20;
     private static final long PHOTO_WIDTH_EMU = Units.toEMU(centimetersToPoints(PHOTO_WIDTH_CM));
     private static final long PHOTO_HEIGHT_EMU = Units.toEMU(centimetersToPoints(PHOTO_HEIGHT_CM));
+    private static final short DEFAULT_FONT_SIZE_PT = 11;
+    private static final short MIN_FONT_SIZE_PT = 8;
+    private static final double TEXT_LINE_HEIGHT_FACTOR = 1.25d;
+    private static final double TEXT_WIDTH_SAFETY_FACTOR = 0.92d;
+    private static final double TEXT_HEIGHT_PADDING_PT = 2d;
+    private static final float EXCEL_MAX_ROW_HEIGHT_PT = 409f;
 
     private static final List<PhotoSlotTemplate> PAGE_PHOTO_SLOTS = List.of(
             new PhotoSlotTemplate(1, 2, 4, 26, 27, 27, 1),
@@ -219,15 +226,19 @@ public class InspectionRecordExcelExporter {
     private void setFixedCellTopCenter(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
         XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
         Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
-        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+        String normalizedValue = Optional.ofNullable(value).orElse("");
+        cell.setCellValue(normalizedValue);
         applyTopCenterAlignment(sheet.getWorkbook(), cell);
+        applyOverflowProtection(sheet, cell, normalizedValue);
     }
 
     private void setFixedCellTopLeft(XSSFSheet sheet, int rowIndex, int columnIndex, String value) {
         XSSFRow row = Optional.ofNullable(sheet.getRow(rowIndex)).orElseGet(() -> sheet.createRow(rowIndex));
         Cell cell = row.getCell(columnIndex, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
-        cell.setCellValue(Optional.ofNullable(value).orElse(""));
+        String normalizedValue = Optional.ofNullable(value).orElse("");
+        cell.setCellValue(normalizedValue);
         applyTopLeftAlignment(sheet.getWorkbook(), cell);
+        applyOverflowProtection(sheet, cell, normalizedValue);
     }
 
     private void applyTopCenterAlignment(Workbook workbook, Cell cell) {
@@ -689,6 +700,7 @@ public class InspectionRecordExcelExporter {
             if (labelRegion != null && labelRegion.getFirstColumn() == labelCell.getColumnIndex()) {
                 String prefix = extractLabelPrefix(labelCell);
                 labelCell.setCellValue(prefix + normalizedValue);
+                applyOverflowProtection(sheet, labelCell, labelCell.getStringCellValue());
                 return;
             }
 
@@ -704,7 +716,232 @@ public class InspectionRecordExcelExporter {
                 }
             }
             target.setCellValue(normalizedValue);
+            applyOverflowProtection(sheet, target, normalizedValue);
         });
+    }
+
+    private void applyOverflowProtection(Sheet sheet, Cell cell, String value) {
+        if (sheet == null || cell == null || !StringUtils.hasText(value)) {
+            return;
+        }
+        Workbook workbook = sheet.getWorkbook();
+        if (workbook == null) {
+            return;
+        }
+        CellStyle baseStyle = cell.getCellStyle();
+        if (baseStyle == null) {
+            return;
+        }
+
+        CellRangeAddress region = resolveCellRegion(sheet, cell);
+        double widthChars = calculateRegionWidthInChars(sheet, region);
+        double heightPoints = calculateRegionHeightInPoints(sheet, region);
+        if (widthChars <= 0 || heightPoints <= 0) {
+            return;
+        }
+
+        short baseFontSize = resolveFontSize(workbook, baseStyle);
+        boolean wrapText = baseStyle.getWrapText() || containsLineBreak(value);
+        short targetFontSize = resolveTargetFontSize(value, widthChars, heightPoints, baseFontSize, wrapText);
+        boolean fitAtTarget = fitsInRegion(value, widthChars, heightPoints, targetFontSize, wrapText);
+
+        CellStyle adjusted = workbook.createCellStyle();
+        adjusted.cloneStyleFrom(baseStyle);
+        adjusted.setShrinkToFit(true);
+        if (wrapText) {
+            adjusted.setWrapText(true);
+        }
+        if (targetFontSize < baseFontSize) {
+            adjusted.setFont(createResizedFont(workbook, baseStyle, targetFontSize));
+        }
+        cell.setCellStyle(adjusted);
+
+        if (wrapText && !fitAtTarget) {
+            double requiredHeight = estimateRequiredHeightPoints(value, widthChars, targetFontSize, true);
+            ensureRegionHeight(sheet, region, requiredHeight);
+        }
+    }
+
+    private CellRangeAddress resolveCellRegion(Sheet sheet, Cell cell) {
+        CellRangeAddress merged = findMergedRegionContaining(sheet, cell);
+        if (merged != null) {
+            return merged;
+        }
+        return new CellRangeAddress(cell.getRowIndex(), cell.getRowIndex(),
+                cell.getColumnIndex(), cell.getColumnIndex());
+    }
+
+    private double calculateRegionWidthInChars(Sheet sheet, CellRangeAddress region) {
+        double width = 0d;
+        for (int column = region.getFirstColumn(); column <= region.getLastColumn(); column++) {
+            width += Math.max(1d, sheet.getColumnWidth(column) / 256d);
+        }
+        return width;
+    }
+
+    private double calculateRegionHeightInPoints(Sheet sheet, CellRangeAddress region) {
+        double height = 0d;
+        for (int rowIndex = region.getFirstRow(); rowIndex <= region.getLastRow(); rowIndex++) {
+            Row row = sheet.getRow(rowIndex);
+            double rowHeight = row != null ? row.getHeightInPoints() : sheet.getDefaultRowHeightInPoints();
+            if (rowHeight <= 0) {
+                rowHeight = sheet.getDefaultRowHeightInPoints();
+            }
+            if (rowHeight <= 0) {
+                rowHeight = DEFAULT_FONT_SIZE_PT * TEXT_LINE_HEIGHT_FACTOR;
+            }
+            height += rowHeight;
+        }
+        return height;
+    }
+
+    private short resolveFontSize(Workbook workbook, CellStyle style) {
+        if (workbook == null || style == null) {
+            return DEFAULT_FONT_SIZE_PT;
+        }
+        Font font = workbook.getFontAt(style.getFontIndex());
+        if (font == null || font.getFontHeightInPoints() <= 0) {
+            return DEFAULT_FONT_SIZE_PT;
+        }
+        return font.getFontHeightInPoints();
+    }
+
+    private short resolveTargetFontSize(String value,
+                                        double widthChars,
+                                        double heightPoints,
+                                        short baseFontSize,
+                                        boolean wrapText) {
+        short lowerBound = (short) Math.min(baseFontSize, MIN_FONT_SIZE_PT);
+        for (int fontSize = baseFontSize; fontSize >= lowerBound; fontSize--) {
+            if (fitsInRegion(value, widthChars, heightPoints, (short) fontSize, wrapText)) {
+                return (short) fontSize;
+            }
+        }
+        return lowerBound;
+    }
+
+    private boolean fitsInRegion(String value,
+                                 double widthChars,
+                                 double heightPoints,
+                                 short fontSize,
+                                 boolean wrapText) {
+        if (!StringUtils.hasText(value)) {
+            return true;
+        }
+        double maxUnitsPerLine = calculateMaxUnitsPerLine(widthChars, fontSize);
+        int requiredLines = estimateRequiredLines(value, maxUnitsPerLine, wrapText);
+        if (!wrapText) {
+            return requiredLines <= 1;
+        }
+        int availableLines = Math.max(1, (int) Math.floor(heightPoints / estimateLineHeight(fontSize)));
+        return requiredLines <= availableLines;
+    }
+
+    private double estimateRequiredHeightPoints(String value, double widthChars, short fontSize, boolean wrapText) {
+        int lines = estimateRequiredLines(value, calculateMaxUnitsPerLine(widthChars, fontSize), wrapText);
+        return lines * estimateLineHeight(fontSize) + TEXT_HEIGHT_PADDING_PT;
+    }
+
+    private double estimateLineHeight(short fontSize) {
+        return Math.max(1d, fontSize) * TEXT_LINE_HEIGHT_FACTOR;
+    }
+
+    private double calculateMaxUnitsPerLine(double widthChars, short fontSize) {
+        if (widthChars <= 0) {
+            return 1d;
+        }
+        double scale = DEFAULT_FONT_SIZE_PT / (double) Math.max(1, fontSize);
+        return Math.max(1d, widthChars * scale * TEXT_WIDTH_SAFETY_FACTOR);
+    }
+
+    private int estimateRequiredLines(String value, double maxUnitsPerLine, boolean wrapText) {
+        if (!StringUtils.hasText(value)) {
+            return 1;
+        }
+        double safeUnitsPerLine = Math.max(1d, maxUnitsPerLine);
+        String normalized = normalizeLineBreaks(value);
+        if (!wrapText) {
+            double units = estimateVisualUnits(normalized.replace("\n", ""));
+            return Math.max(1, (int) Math.ceil(units / safeUnitsPerLine));
+        }
+        String[] lines = normalized.split("\n", -1);
+        int required = 0;
+        for (String line : lines) {
+            double units = estimateVisualUnits(line);
+            required += Math.max(1, (int) Math.ceil(units / safeUnitsPerLine));
+        }
+        return Math.max(1, required);
+    }
+
+    private String normalizeLineBreaks(String value) {
+        return value.replace("\r\n", "\n").replace('\r', '\n');
+    }
+
+    private boolean containsLineBreak(String value) {
+        return value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0;
+    }
+
+    private double estimateVisualUnits(String value) {
+        if (value == null || value.isEmpty()) {
+            return 1d;
+        }
+        double units = 0d;
+        for (int i = 0; i < value.length(); ) {
+            int codePoint = value.codePointAt(i);
+            i += Character.charCount(codePoint);
+            if (codePoint == '\t') {
+                units += 4d;
+                continue;
+            }
+            if (Character.isWhitespace(codePoint)) {
+                units += 0.5d;
+                continue;
+            }
+            units += isWideCharacter(codePoint) ? 2d : 1d;
+        }
+        return Math.max(1d, units);
+    }
+
+    private boolean isWideCharacter(int codePoint) {
+        return (codePoint >= 0x2E80 && codePoint <= 0xA4CF)
+                || (codePoint >= 0xAC00 && codePoint <= 0xD7A3)
+                || (codePoint >= 0xF900 && codePoint <= 0xFAFF)
+                || (codePoint >= 0xFE10 && codePoint <= 0xFE6F)
+                || (codePoint >= 0xFF01 && codePoint <= 0xFF60)
+                || (codePoint >= 0xFFE0 && codePoint <= 0xFFE6);
+    }
+
+    private Font createResizedFont(Workbook workbook, CellStyle style, short fontSize) {
+        Font base = workbook.getFontAt(style.getFontIndex());
+        Font resized = workbook.createFont();
+        if (base != null) {
+            resized.setBold(base.getBold());
+            resized.setCharSet(base.getCharSet());
+            resized.setColor(base.getColor());
+            resized.setFontName(base.getFontName());
+            resized.setItalic(base.getItalic());
+            resized.setStrikeout(base.getStrikeout());
+            resized.setTypeOffset(base.getTypeOffset());
+            resized.setUnderline(base.getUnderline());
+        }
+        resized.setFontHeightInPoints(fontSize);
+        return resized;
+    }
+
+    private void ensureRegionHeight(Sheet sheet, CellRangeAddress region, double requiredHeight) {
+        double currentHeight = calculateRegionHeightInPoints(sheet, region);
+        if (requiredHeight <= currentHeight + 0.1d) {
+            return;
+        }
+        int lastRowIndex = region.getLastRow();
+        Row lastRow = Optional.ofNullable(sheet.getRow(lastRowIndex)).orElseGet(() -> sheet.createRow(lastRowIndex));
+        double lastRowHeight = lastRow.getHeightInPoints();
+        if (lastRowHeight <= 0) {
+            lastRowHeight = sheet.getDefaultRowHeightInPoints();
+        }
+        double grow = requiredHeight - currentHeight;
+        float newHeight = (float) Math.min(EXCEL_MAX_ROW_HEIGHT_PT, lastRowHeight + grow);
+        lastRow.setHeightInPoints(newHeight);
     }
 
     private CellRangeAddress findMergedRegionContaining(Sheet sheet, Cell cell) {

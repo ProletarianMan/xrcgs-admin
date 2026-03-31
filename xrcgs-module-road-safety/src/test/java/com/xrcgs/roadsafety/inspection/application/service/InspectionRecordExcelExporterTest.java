@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -201,6 +202,54 @@ class InspectionRecordExcelExporterTest {
         }
     }
 
+    @Test
+    void shouldShrinkFontAndExpandRowForOverflowText() throws Exception {
+        Path template = Paths.get("src/test/resources/excel/inspection_record.xlsx");
+        InspectionRecordExcelExporter exporter = new InspectionRecordExcelExporter(new FileSystemResource(template));
+
+        InspectionRecord baseline = buildOverflowRecord(
+                "baseline.xlsx",
+                "张三、李四",
+                "王五",
+                "送达2026-001号《工作联系单》\n被送达单位：交警大队",
+                "现场秩序良好。");
+        InspectionRecord overflow = buildOverflowRecord(
+                "overflow.xlsx",
+                repeat("交班人员", 24),
+                repeat("接班人员", 20),
+                "送达" + repeat("2026-001", 12) + "号《工作联系单》\n被送达单位：" + repeat("交警大队", 14),
+                repeat("备注内容较长需要缩放并避免打印截断。", 120));
+
+        Path baselinePath = exporter.export(baseline, tempDir);
+        Path overflowPath = exporter.export(overflow, tempDir);
+
+        try (InputStream baselineIn = Files.newInputStream(baselinePath);
+             XSSFWorkbook baselineWb = new XSSFWorkbook(baselineIn);
+             InputStream overflowIn = Files.newInputStream(overflowPath);
+             XSSFWorkbook overflowWb = new XSSFWorkbook(overflowIn)) {
+            XSSFSheet baselineSheet = baselineWb.getSheetAt(0);
+            XSSFSheet overflowSheet = overflowWb.getSheetAt(0);
+
+            Cell baselineHandoverCell = baselineSheet.getRow(8).getCell(1);
+            Cell overflowHandoverCell = overflowSheet.getRow(8).getCell(1);
+            assertThat(overflowHandoverCell.getCellStyle().getShrinkToFit()).isTrue();
+            assertThat(getFontSizeInPoints(overflowWb, overflowHandoverCell))
+                    .isLessThan(getFontSizeInPoints(baselineWb, baselineHandoverCell));
+
+            Cell baselineRemarkCell = baselineSheet.getRow(11).getCell(0);
+            Cell overflowRemarkCell = overflowSheet.getRow(11).getCell(0);
+            assertThat((Object) baselineRemarkCell).isNotNull();
+            assertThat((Object) overflowRemarkCell).isNotNull();
+            assertThat(overflowRemarkCell.getCellStyle().getShrinkToFit()).isTrue();
+            assertThat(getFontSizeInPoints(overflowWb, overflowRemarkCell))
+                    .isLessThanOrEqualTo(getFontSizeInPoints(baselineWb, baselineRemarkCell));
+
+            float baselineRemarkRowHeight = baselineSheet.getRow(baselineRemarkCell.getRowIndex()).getHeightInPoints();
+            float overflowRemarkRowHeight = overflowSheet.getRow(overflowRemarkCell.getRowIndex()).getHeightInPoints();
+            assertThat(overflowRemarkRowHeight).isGreaterThan(baselineRemarkRowHeight);
+        }
+    }
+
     private Path createSampleImage(Path path, String text) throws IOException {
         BufferedImage image = new BufferedImage(600, 400, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
@@ -211,6 +260,42 @@ class InspectionRecordExcelExporterTest {
         graphics.dispose();
         javax.imageio.ImageIO.write(image, "jpg", path.toFile());
         return path;
+    }
+
+    private InspectionRecord buildOverflowRecord(String fileName,
+                                                 String handoverFrom,
+                                                 String handoverTo,
+                                                 String deliveryText,
+                                                 String remark) {
+        return InspectionRecord.builder()
+                .id(1L)
+                .date(LocalDate.of(2024, 12, 1))
+                .unitName("乌鲁木齐葛洲坝电建路桥绕城高速公司")
+                .weather("晴")
+                .patrolTeam("巡查一队")
+                .patrolVehicle("巡逻车A123")
+                .location("K10+000-K20+000")
+                .handoverSummary("交接巡查车辆与装备完毕。")
+                .handoverFromDisplay(handoverFrom)
+                .handoverToDisplay(handoverTo)
+                .deliveryContactDisplay(deliveryText)
+                .remark(remark)
+                .photos(Collections.emptyList())
+                .exportFileName(fileName)
+                .build();
+    }
+
+    private String repeat(String text, int times) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < times; i++) {
+            builder.append(text);
+        }
+        return builder.toString();
+    }
+
+    private short getFontSizeInPoints(XSSFWorkbook workbook, Cell cell) {
+        Font font = workbook.getFontAt(cell.getCellStyle().getFontIndex());
+        return font.getFontHeightInPoints();
     }
 
     private String readValueRightOfLabel(Sheet sheet, String label) {
