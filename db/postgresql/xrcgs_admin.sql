@@ -12,7 +12,7 @@
  Target Server Version : 160012 (160012)
  File Encoding         : 65001
 
- Date: 27/02/2026 12:23:55
+ Date: 01/04/2026 18:52:11
 */
 
 
@@ -148,16 +148,16 @@ CREATE TABLE "public"."sys_op_log" (
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."sys_permission";
 CREATE TABLE "public"."sys_permission" (
-    "id" int8 NOT NULL,
-    "parent_id" int8 NOT NULL DEFAULT 0,
-    "code" varchar(128) COLLATE "pg_catalog"."default" NOT NULL,
-    "name" varchar(64) COLLATE "pg_catalog"."default" NOT NULL,
-    "remark" varchar(255) COLLATE "pg_catalog"."default",
-    "sort_no" int4 NOT NULL DEFAULT 0,
-    "created_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP
-  )
-  ;
+  "id" int8 NOT NULL,
+  "code" varchar(128) COLLATE "pg_catalog"."default" NOT NULL,
+  "name" varchar(64) COLLATE "pg_catalog"."default" NOT NULL,
+  "created_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" timestamp(6) DEFAULT CURRENT_TIMESTAMP,
+  "parent_id" int8 NOT NULL DEFAULT 0,
+  "remark" varchar(255) COLLATE "pg_catalog"."default",
+  "sort_no" int4 NOT NULL DEFAULT 0
+)
+;
 
 -- ----------------------------
 -- Table structure for sys_role
@@ -303,10 +303,14 @@ ALTER TABLE "public"."sys_role_menu" ADD CONSTRAINT "sys_role_menu_pkey" PRIMARY
 ALTER TABLE "public"."sys_role_perm" ADD CONSTRAINT "sys_role_perm_pkey" PRIMARY KEY ("id");
 
 -- ----------------------------
+-- Checks structure for table sys_user
+-- ----------------------------
+ALTER TABLE "public"."sys_user" ADD CONSTRAINT "chk_sys_user_gender" CHECK (gender IS NULL OR (gender = ANY (ARRAY[0, 1])));
+
+-- ----------------------------
 -- Primary Key structure for table sys_user
 -- ----------------------------
 ALTER TABLE "public"."sys_user" ADD CONSTRAINT "sys_user_pkey" PRIMARY KEY ("id");
-ALTER TABLE "public"."sys_user" ADD CONSTRAINT "chk_sys_user_gender" CHECK ("gender" IS NULL OR "gender" = ANY (ARRAY[0, 1]));
 
 -- ----------------------------
 -- Primary Key structure for table sys_user_role

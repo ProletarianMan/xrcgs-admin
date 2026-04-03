@@ -12,7 +12,7 @@
  Target Server Version : 160012 (160012)
  File Encoding         : 65001
 
- Date: 27/02/2026 12:24:15
+ Date: 01/04/2026 18:52:01
 */
 
 
@@ -68,11 +68,11 @@ CREATE TABLE "public"."road_inspection_record" (
   "exported_by" varchar(64) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
   "exported_at" timestamp(6),
   "export_file_name" varchar(255) COLLATE "pg_catalog"."default" DEFAULT NULL::character varying,
+  "approval_status" varchar(32) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'UNSUBMITTED'::character varying,
+  "squad_code" varchar(64) COLLATE "pg_catalog"."default" NOT NULL,
   "form_payload_json" text COLLATE "pg_catalog"."default",
   "details_payload_json" text COLLATE "pg_catalog"."default",
-  "summary_payload_json" text COLLATE "pg_catalog"."default",
-  "approval_status" varchar(32) COLLATE "pg_catalog"."default" NOT NULL DEFAULT 'UNSUBMITTED'::character varying,
-  "squad_code" varchar(64) COLLATE "pg_catalog"."default" NOT NULL
+  "summary_payload_json" text COLLATE "pg_catalog"."default"
 )
 ;
 
@@ -87,13 +87,18 @@ ALTER TABLE "public"."road_inspection_handling_detail" ADD CONSTRAINT "road_insp
 ALTER TABLE "public"."road_inspection_photo" ADD CONSTRAINT "road_inspection_photo_pkey" PRIMARY KEY ("id");
 
 -- ----------------------------
--- Primary Key structure for table road_inspection_record
+-- Indexes structure for table road_inspection_record
 -- ----------------------------
-ALTER TABLE "public"."road_inspection_record" ADD CONSTRAINT "road_inspection_record_pkey" PRIMARY KEY ("id");
 CREATE UNIQUE INDEX "uk_record_date_squad_code" ON "public"."road_inspection_record" USING btree (
   "record_date" "pg_catalog"."date_ops" ASC NULLS LAST,
   "squad_code" COLLATE "pg_catalog"."default" "pg_catalog"."text_ops" ASC NULLS LAST
 );
+COMMENT ON INDEX "public"."uk_record_date_squad_code" IS '日期和中队唯一键';
+
+-- ----------------------------
+-- Primary Key structure for table road_inspection_record
+-- ----------------------------
+ALTER TABLE "public"."road_inspection_record" ADD CONSTRAINT "road_inspection_record_pkey" PRIMARY KEY ("id");
 
 -- ----------------------------
 -- Foreign Keys structure for table road_inspection_handling_detail
