@@ -72,7 +72,11 @@ public class InspectionLogSubmitExportMapper {
                         .map(HandoverInfo::getInspectors).orElse(Collections.emptyList())))
                 .patrolVehicle(normalizeText(request.getVehicle()))
                 .location(location)
-                .inspectionContent(buildInspectionContent(request, routeText, mileageText, sourceDetails.size()))
+                .inspectionContent(buildInspectionContent(
+                        request,
+                        routeText,
+                        mileageText,
+                        (int) sourceDetails.stream().filter(detail -> !isDailyPatrol(detail)).count()))
                 .issuesFound(buildIssuesFound(sourceDetails))
                 .handlingSituationRaw(buildHandlingSituationRaw(sourceDetails))
                 .handlingGroup(handlingGroup)
@@ -112,6 +116,7 @@ public class InspectionLogSubmitExportMapper {
     private String resolveCategoryName(InspectionDetail detail) {
         CanonicalDetailType type = mapDetailType(detail == null ? null : detail.getType());
         return switch (type) {
+            case DAILY_PATROL -> "DAILY_PATROL";
             case ROAD_DAMAGE -> "ROAD_DAMAGE";
             case ACCIDENT, RESCUE -> "ACCIDENT_RESCUE";
             case COMPENSATION -> "COMPENSATION";
@@ -128,6 +133,7 @@ public class InspectionLogSubmitExportMapper {
         }
         String normalized = type.trim().toUpperCase();
         return switch (normalized) {
+            case "DAILY_PATROL" -> CanonicalDetailType.DAILY_PATROL;
             case "ROAD_DAMAGE" -> CanonicalDetailType.ROAD_DAMAGE;
             case "ACCIDENT" -> CanonicalDetailType.ACCIDENT;
             case "RESCUE" -> CanonicalDetailType.RESCUE;
@@ -196,6 +202,7 @@ public class InspectionLogSubmitExportMapper {
 
     private String buildIssuesFound(List<InspectionDetail> details) {
         List<String> lines = details.stream()
+                .filter(detail -> !isDailyPatrol(detail))
                 .map(detail -> joinNonBlank(" ", normalizeText(detail.getTime()),
                         firstNonBlank(detail.getLocation(), detail.getStation(), detail.getLocationStake()),
                         normalizeText(detail.getDescription())))
@@ -206,6 +213,7 @@ public class InspectionLogSubmitExportMapper {
 
     private String buildHandlingSituationRaw(List<InspectionDetail> details) {
         List<String> lines = details.stream()
+                .filter(detail -> !isDailyPatrol(detail))
                 .map(detail -> {
                     if (!StringUtils.hasText(detail.getResult())) {
                         return null;
@@ -379,5 +387,9 @@ public class InspectionLogSubmitExportMapper {
             }
         }
         return null;
+    }
+
+    private boolean isDailyPatrol(InspectionDetail detail) {
+        return mapDetailType(detail == null ? null : detail.getType()) == CanonicalDetailType.DAILY_PATROL;
     }
 }

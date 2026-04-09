@@ -49,6 +49,7 @@ public class CanonicalInspectionExportModel {
     }
 
     public enum CanonicalDetailType {
+        DAILY_PATROL,
         ROAD_DAMAGE,
         ACCIDENT,
         RESCUE,
@@ -60,4 +61,3 @@ public class CanonicalInspectionExportModel {
         OTHER
     }
 }
-
