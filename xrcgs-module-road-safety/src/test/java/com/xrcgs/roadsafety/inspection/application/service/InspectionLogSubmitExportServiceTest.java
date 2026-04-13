@@ -367,6 +367,59 @@ class InspectionLogSubmitExportServiceTest {
         verify(sysFileService, never()).softDelete(anyLong(), anyBoolean());
     }
 
+    @Test
+    void shouldDeleteRecordAndRelatedResourcesById() throws Exception {
+        Long recordId = 500L;
+        Path exportFile = tempDir.resolve("delete-log.xlsx");
+        Files.writeString(exportFile, "to-delete");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(recordId);
+        existing.setExportFileName("delete-log.xlsx");
+
+        PhotoItem photoA = PhotoItem.builder().recordId(recordId).fileId(9001L).build();
+        PhotoItem photoB = PhotoItem.builder().recordId(recordId).fileId(9002L).build();
+        PhotoItem duplicatedPhotoA = PhotoItem.builder().recordId(recordId).fileId(9001L).build();
+
+        when(recordMapper.selectById(recordId)).thenReturn(existing);
+        when(photoMapper.selectList(any())).thenReturn(List.of(photoA, photoB, duplicatedPhotoA));
+        when(recordMapper.deleteById(recordId)).thenReturn(1);
+        when(photoMapper.selectCount(any())).thenReturn(0L, 0L);
+        when(sysFileService.softDelete(9001L, true)).thenReturn(true);
+        when(sysFileService.softDelete(9002L, true)).thenReturn(true);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+
+        service.deleteById(recordId);
+
+        verify(detailMapper).delete(any());
+        verify(photoMapper).delete(any());
+        verify(recordMapper).deleteById(recordId);
+        verify(sysFileService).softDelete(9001L, true);
+        verify(sysFileService).softDelete(9002L, true);
+        assertThat(Files.exists(exportFile)).isFalse();
+    }
+
+    @Test
+    void shouldFailDeleteWhenExportFileCannotBeRemoved() throws Exception {
+        Long recordId = 501L;
+        Path exportPath = tempDir.resolve("delete-broken.xlsx");
+        Files.createDirectories(exportPath);
+        Files.writeString(exportPath.resolve("child.txt"), "block-delete");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(recordId);
+        existing.setExportFileName("delete-broken.xlsx");
+
+        when(recordMapper.selectById(recordId)).thenReturn(existing);
+        when(photoMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(recordMapper.deleteById(recordId)).thenReturn(1);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+
+        assertThatThrownBy(() -> service.deleteById(recordId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("delete inspection export file failed");
+    }
+
     private InspectionLogSubmitExportRequest buildRequest() {
         InspectionLogSubmitExportRequest request = new InspectionLogSubmitExportRequest();
         request.setDate("2026-03-30");

@@ -125,6 +125,18 @@ public class InspectionLogController {
         streamFile(exportFile, response);
     }
 
+    /**
+     * 删除巡查日志
+     * @param id 日志ID
+     * @return
+     */
+    @PostMapping("/delete")
+    @OpLog("删除巡查日志")
+    public R<Boolean> delete(@RequestParam(name = "id") @Min(1) long id) {
+        submitExportService.deleteById(id);
+        return R.ok(true);
+    }
+
     private void streamFile(Path exportFile, HttpServletResponse response) throws IOException {
         try (InputStream inputStream = Files.newInputStream(exportFile)) {
             String fileName = exportFile.getFileName().toString();

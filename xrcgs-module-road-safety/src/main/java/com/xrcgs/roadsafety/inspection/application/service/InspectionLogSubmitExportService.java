@@ -56,6 +56,7 @@ import org.springframework.util.StringUtils;
 public class InspectionLogSubmitExportService {
 
     private static final Logger log = LoggerFactory.getLogger(InspectionLogSubmitExportService.class);
+    private static final String DEFAULT_EXPORT_FILE_NAME = "inspection_record_output.xlsx";
 
     private static final String DICT_UNIT_NAMES = "unitNames";
     private static final String DICT_WEATHERS = "weathers";
@@ -200,6 +201,28 @@ public class InspectionLogSubmitExportService {
         return exported;
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteById(Long id) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException("inspection record id is invalid: " + id);
+        }
+        InspectionRecord existingRecord = findById(id);
+        if (existingRecord == null || existingRecord.getId() == null) {
+            throw new IllegalArgumentException("inspection record not found, id=" + id);
+        }
+
+        Set<Long> relatedFileIds = collectRelatedFileIds(id);
+        deleteDetailRows(id);
+        deletePhotoRows(id);
+        int deletedRows = recordMapper.deleteById(id);
+        if (deletedRows <= 0) {
+            throw new IllegalStateException("delete inspection record failed, id=" + id);
+        }
+
+        deleteRelatedPhotoFiles(relatedFileIds);
+        deleteExportFile(existingRecord);
+    }
+
     private Set<Long> collectFileIds(List<PhotoItem> photos) {
         if (photos == null || photos.isEmpty()) {
             return Collections.emptySet();
@@ -212,6 +235,77 @@ public class InspectionLogSubmitExportService {
             ids.add(photo.getFileId());
         }
         return ids;
+    }
+
+    private Set<Long> collectRelatedFileIds(Long recordId) {
+        if (recordId == null) {
+            return Collections.emptySet();
+        }
+        List<PhotoItem> photos = photoMapper.selectList(Wrappers.lambdaQuery(PhotoItem.class)
+                .eq(PhotoItem::getRecordId, recordId));
+        return collectFileIds(photos);
+    }
+
+    private void deleteRelatedPhotoFiles(Set<Long> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return;
+        }
+        for (Long fileId : fileIds) {
+            if (fileId == null || fileId <= 0) {
+                continue;
+            }
+            Long refCount = photoMapper.selectCount(Wrappers.lambdaQuery(PhotoItem.class)
+                    .eq(PhotoItem::getFileId, fileId));
+            if (refCount != null && refCount > 0) {
+                continue;
+            }
+            try {
+                boolean deleted = sysFileService.softDelete(fileId, true);
+                if (!deleted) {
+                    throw new IllegalStateException("delete inspection photo failed, fileId=" + fileId);
+                }
+            } catch (Exception ex) {
+                throw new IllegalStateException("delete inspection photo failed, fileId=" + fileId, ex);
+            }
+        }
+    }
+
+    private void deleteExportFile(InspectionRecord record) {
+        Path exportPath = resolveExportFilePath(record);
+        if (!Files.exists(exportPath)) {
+            return;
+        }
+        try {
+            Files.delete(exportPath);
+        } catch (IOException ex) {
+            throw new IllegalStateException("delete inspection export file failed: " + exportPath, ex);
+        }
+        if (Files.exists(exportPath)) {
+            throw new IllegalStateException("inspection export file still exists after delete: " + exportPath);
+        }
+    }
+
+    private Path resolveExportFilePath(InspectionRecord record) {
+        Path storageDirectory;
+        try {
+            storageDirectory = resolveStorageDirectory();
+        } catch (IOException ex) {
+            throw new IllegalStateException("inspection export storage directory is unavailable", ex);
+        }
+        String exportFileName = normalizeExportFileName(record == null ? null : record.getExportFileName());
+        Path exportPath = storageDirectory.resolve(exportFileName).toAbsolutePath().normalize();
+        if (!exportPath.startsWith(storageDirectory)) {
+            throw new IllegalArgumentException("inspection export file name is invalid: " + exportFileName);
+        }
+        return exportPath;
+    }
+
+    private String normalizeExportFileName(String fileName) {
+        if (!StringUtils.hasText(fileName)) {
+            return DEFAULT_EXPORT_FILE_NAME;
+        }
+        String normalized = fileName.trim();
+        return normalized.toLowerCase(Locale.ROOT).endsWith(".xlsx") ? normalized : normalized + ".xlsx";
     }
 
     private Set<Long> resolveRemovedFileIds(Long recordId, Set<Long> retainedFileIds) {
