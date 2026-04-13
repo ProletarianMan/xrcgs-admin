@@ -11,6 +11,7 @@ import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogDetailVO;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogPageItemVO;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitRequest;
+import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogUpdateSubmitExportRequest;
 import com.xrcgs.syslog.annotation.OpLog;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
@@ -103,6 +104,24 @@ public class InspectionLogController {
             throw new ConstraintViolationException(violations);
         }
         Path exportFile = submitExportService.submitAndExport(request, payload);
+        streamFile(exportFile, response);
+    }
+
+    /**
+     * 修改巡查日志
+     * @param payload 日志内容
+     * @param response
+     * @throws IOException
+     */
+    @PostMapping("/update")
+    @OpLog("修改巡查日志数据")
+    public void update(@RequestBody JsonNode payload, HttpServletResponse response) throws IOException {
+        InspectionLogUpdateSubmitExportRequest request = objectMapper.treeToValue(payload, InspectionLogUpdateSubmitExportRequest.class);
+        Set<ConstraintViolation<InspectionLogUpdateSubmitExportRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        Path exportFile = submitExportService.updateAndExportById(request, payload);
         streamFile(exportFile, response);
     }
 

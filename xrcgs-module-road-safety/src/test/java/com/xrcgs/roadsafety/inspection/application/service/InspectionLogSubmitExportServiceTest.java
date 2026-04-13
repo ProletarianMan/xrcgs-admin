@@ -3,7 +3,9 @@ package com.xrcgs.roadsafety.inspection.application.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,6 +15,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xrcgs.common.cache.AuthCacheService;
+import com.xrcgs.file.service.SysFileService;
 import com.xrcgs.iam.model.vo.DictVO;
 import com.xrcgs.iam.service.DictService;
 import com.xrcgs.roadsafety.inspection.application.dto.CanonicalInspectionExportModel;
@@ -31,6 +34,7 @@ import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportR
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.HandoverInfo;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.Mileage;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.MileageInfo;
+import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogUpdateSubmitExportRequest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -66,6 +70,8 @@ class InspectionLogSubmitExportServiceTest {
     private DictService dictService;
     @Mock
     private AuthCacheService authCacheService;
+    @Mock
+    private SysFileService sysFileService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private InspectionLogSubmitExportService service;
@@ -84,7 +90,8 @@ class InspectionLogSubmitExportServiceTest {
                 photoMapper,
                 objectMapper,
                 dictService,
-                authCacheService
+                authCacheService,
+                sysFileService
         );
     }
 
@@ -243,8 +250,143 @@ class InspectionLogSubmitExportServiceTest {
         verify(photoMapper).delete(any());
     }
 
+    @Test
+    void shouldUpdateExistingRecordById() throws Exception {
+        InspectionLogUpdateSubmitExportRequest request = buildUpdateRequest(400L);
+        JsonNode rawPayload = objectMapper.readTree("{\"id\":400,\"details\":[{\"type\":\"OTHER\",\"summaryText\":\"new\"}]}");
+        CanonicalInspectionExportModel canonical = buildCanonicalWithOneDetailAndPhoto();
+        Path exported = tempDir.resolve("submit-export-update.xlsx");
+        Files.writeString(exported, "ok");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(400L);
+        existing.setCreatedBy("creator");
+        existing.setCreatedAt(LocalDate.of(2026, 3, 1).atStartOfDay());
+
+        when(mapper.toCanonical(request, rawPayload)).thenReturn(canonical);
+        when(recordMapper.selectById(400L)).thenReturn(existing);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+        when(authCacheService.getCachedDict(any())).thenReturn(null);
+        when(dictService.getByTypes(anyList(), isNull())).thenReturn(fullDictMap());
+        when(recordMapper.updateById(any(InspectionRecord.class))).thenReturn(1);
+        when(excelExporter.export(any(InspectionRecord.class), any(Path.class))).thenReturn(exported);
+
+        Path result = service.updateAndExportById(request, rawPayload);
+
+        assertThat(result).isEqualTo(exported);
+        verify(recordMapper, never()).insert(any(InspectionRecord.class));
+        verify(recordMapper).updateById(any(InspectionRecord.class));
+        verify(detailMapper).delete(any());
+        verify(photoMapper).delete(any());
+        verify(detailMapper).insert(any());
+        verify(photoMapper).insert(any());
+    }
+
+    @Test
+    void shouldFailWhenUpdateRecordNotFound() throws Exception {
+        InspectionLogUpdateSubmitExportRequest request = buildUpdateRequest(401L);
+        JsonNode rawPayload = objectMapper.readTree("{\"id\":401,\"details\":[]}");
+        CanonicalInspectionExportModel canonical = buildCanonical();
+
+        when(mapper.toCanonical(request, rawPayload)).thenReturn(canonical);
+        when(recordMapper.selectById(401L)).thenReturn(null);
+
+        assertThatThrownBy(() -> service.updateAndExportById(request, rawPayload))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("inspection record not found");
+
+        verify(recordMapper, never()).updateById(any(InspectionRecord.class));
+        verify(excelExporter, never()).export(any(InspectionRecord.class), any(Path.class));
+    }
+
+    @Test
+    void shouldCleanupRemovedFileWhenUpdateRemovesPhoto() throws Exception {
+        InspectionLogUpdateSubmitExportRequest request = buildUpdateRequest(402L);
+        JsonNode rawPayload = objectMapper.readTree("{\"id\":402,\"details\":[]}");
+        CanonicalInspectionExportModel canonical = buildCanonical();
+        Path exported = tempDir.resolve("submit-export-update-cleanup.xlsx");
+        Files.writeString(exported, "ok");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(402L);
+        existing.setCreatedBy("creator");
+        existing.setCreatedAt(LocalDate.of(2026, 3, 1).atStartOfDay());
+
+        PhotoItem oldPhoto = PhotoItem.builder()
+                .recordId(402L)
+                .fileId(999L)
+                .build();
+
+        when(mapper.toCanonical(request, rawPayload)).thenReturn(canonical);
+        when(recordMapper.selectById(402L)).thenReturn(existing);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+        when(authCacheService.getCachedDict(any())).thenReturn(null);
+        when(dictService.getByTypes(anyList(), isNull())).thenReturn(fullDictMap());
+        when(photoMapper.selectList(any())).thenReturn(List.of(oldPhoto));
+        when(photoMapper.selectCount(any())).thenReturn(0L);
+        when(recordMapper.updateById(any(InspectionRecord.class))).thenReturn(1);
+        when(excelExporter.export(any(InspectionRecord.class), any(Path.class))).thenReturn(exported);
+
+        Path result = service.updateAndExportById(request, rawPayload);
+
+        assertThat(result).isEqualTo(exported);
+        verify(sysFileService).softDelete(999L, true);
+    }
+
+    @Test
+    void shouldNotCleanupFileWhenStillReferenced() throws Exception {
+        InspectionLogUpdateSubmitExportRequest request = buildUpdateRequest(403L);
+        JsonNode rawPayload = objectMapper.readTree("{\"id\":403,\"details\":[]}");
+        CanonicalInspectionExportModel canonical = buildCanonical();
+        Path exported = tempDir.resolve("submit-export-update-no-cleanup.xlsx");
+        Files.writeString(exported, "ok");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(403L);
+        existing.setCreatedBy("creator");
+        existing.setCreatedAt(LocalDate.of(2026, 3, 1).atStartOfDay());
+
+        PhotoItem oldPhoto = PhotoItem.builder()
+                .recordId(403L)
+                .fileId(888L)
+                .build();
+
+        when(mapper.toCanonical(request, rawPayload)).thenReturn(canonical);
+        when(recordMapper.selectById(403L)).thenReturn(existing);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+        when(authCacheService.getCachedDict(any())).thenReturn(null);
+        when(dictService.getByTypes(anyList(), isNull())).thenReturn(fullDictMap());
+        when(photoMapper.selectList(any())).thenReturn(List.of(oldPhoto));
+        when(photoMapper.selectCount(any())).thenReturn(1L);
+        when(recordMapper.updateById(any(InspectionRecord.class))).thenReturn(1);
+        when(excelExporter.export(any(InspectionRecord.class), any(Path.class))).thenReturn(exported);
+
+        Path result = service.updateAndExportById(request, rawPayload);
+
+        assertThat(result).isEqualTo(exported);
+        verify(sysFileService, never()).softDelete(anyLong(), anyBoolean());
+    }
+
     private InspectionLogSubmitExportRequest buildRequest() {
         InspectionLogSubmitExportRequest request = new InspectionLogSubmitExportRequest();
+        request.setDate("2026-03-30");
+        request.setTeam("TEAM_01");
+        request.setUnitName("U1");
+        request.setShiftType(InspectionLogSubmitExportRequest.ShiftType.BOTH);
+        request.setRoutes(List.of("S1", "S2"));
+        request.setVehicle("V1");
+        request.setWeather("W1");
+        request.setMileage(buildMileage());
+        request.setHandover(buildHandover());
+        request.setDeliveries(buildDeliveries());
+        request.setDetails(Collections.emptyList());
+        request.setDraft(false);
+        return request;
+    }
+
+    private InspectionLogUpdateSubmitExportRequest buildUpdateRequest(Long id) {
+        InspectionLogUpdateSubmitExportRequest request = new InspectionLogUpdateSubmitExportRequest();
+        request.setId(id);
         request.setDate("2026-03-30");
         request.setTeam("TEAM_01");
         request.setUnitName("U1");

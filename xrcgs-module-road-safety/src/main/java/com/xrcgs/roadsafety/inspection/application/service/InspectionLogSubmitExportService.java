@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.cache.AuthCacheService;
 import com.xrcgs.common.enums.ApprovalStatus;
+import com.xrcgs.file.service.SysFileService;
 import com.xrcgs.iam.model.vo.DictVO;
 import com.xrcgs.iam.service.DictService;
 import com.xrcgs.roadsafety.inspection.application.dto.CanonicalInspectionExportModel;
@@ -23,6 +24,7 @@ import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportR
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.Delivery;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.Mileage;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.MileageInfo;
+import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogUpdateSubmitExportRequest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -32,20 +34,28 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
 public class InspectionLogSubmitExportService {
+
+    private static final Logger log = LoggerFactory.getLogger(InspectionLogSubmitExportService.class);
 
     private static final String DICT_UNIT_NAMES = "unitNames";
     private static final String DICT_WEATHERS = "weathers";
@@ -67,12 +77,15 @@ public class InspectionLogSubmitExportService {
     private final ObjectMapper objectMapper;
     private final DictService dictService;
     private final AuthCacheService authCacheService;
+    private final SysFileService sysFileService;
 
     @Transactional(rollbackFor = Exception.class)
     public Path submitAndExport(InspectionLogSubmitExportRequest request, JsonNode rawPayload) throws IOException {
         CanonicalInspectionExportModel canonical = mapper.toCanonical(request, rawPayload);
         LocalDateTime now = LocalDateTime.now();
         InspectionRecord existingRecord = findLatestByDateAndSquad(canonical.getDate(), canonical.getTeamCode());
+        Set<Long> retainedFileIds = collectFileIds(canonical.getPhotos());
+        Set<Long> removedFileIds = Collections.emptySet();
         InspectionRecord persistenceRecord = InspectionRecord.builder()
                 .id(existingRecord == null ? null : existingRecord.getId())
                 .date(canonical.getDate())
@@ -120,14 +133,141 @@ public class InspectionLogSubmitExportService {
                 persistenceRecord.setId(latestRecord.getId());
                 persistenceRecord.setCreatedBy(resolveCreatedBy(latestRecord, canonical.getPatrolTeam()));
                 persistenceRecord.setCreatedAt(resolveCreatedAt(latestRecord, now));
+                removedFileIds = resolveRemovedFileIds(persistenceRecord.getId(), retainedFileIds);
                 overwriteExistingRecord(persistenceRecord);
             }
         } else {
+            removedFileIds = resolveRemovedFileIds(persistenceRecord.getId(), retainedFileIds);
             overwriteExistingRecord(persistenceRecord);
         }
         saveDetailRows(persistenceRecord.getId(), canonical.getDetails(), now);
         savePhotoRows(persistenceRecord.getId(), canonical.getPhotos(), now);
+        scheduleCleanupRemovedFiles(removedFileIds);
         return exported;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Path updateAndExportById(InspectionLogUpdateSubmitExportRequest request, JsonNode rawPayload) throws IOException {
+        CanonicalInspectionExportModel canonical = mapper.toCanonical(request, rawPayload);
+        LocalDateTime now = LocalDateTime.now();
+        InspectionRecord existingRecord = findById(request.getId());
+        if (existingRecord == null || existingRecord.getId() == null) {
+            throw new IllegalArgumentException("inspection record not found, id=" + request.getId());
+        }
+        Set<Long> retainedFileIds = collectFileIds(canonical.getPhotos());
+        Set<Long> removedFileIds = resolveRemovedFileIds(existingRecord.getId(), retainedFileIds);
+
+        InspectionRecord persistenceRecord = InspectionRecord.builder()
+                .id(existingRecord.getId())
+                .date(canonical.getDate())
+                .unitName(canonical.getUnitName())
+                .weather(canonical.getWeather())
+                .patrolTeam(canonical.getPatrolTeam())
+                .patrolVehicle(canonical.getPatrolVehicle())
+                .location(canonical.getLocation())
+                .inspectionContent(canonical.getInspectionContent())
+                .issuesFound(canonical.getIssuesFound())
+                .handlingSituationRaw(canonical.getHandlingSituationRaw())
+                .handlingDetails(canonical.getHandlingGroup())
+                .photos(Optional.ofNullable(canonical.getPhotos()).orElse(Collections.emptyList()))
+                .handoverSummary(canonical.getHandoverSummary())
+                .remark(canonical.getRemark())
+                .createdBy(resolveCreatedBy(existingRecord, canonical.getPatrolTeam()))
+                .createdAt(resolveCreatedAt(existingRecord, now))
+                .updatedAt(now)
+                .exportedBy(canonical.getPatrolTeam())
+                .exportedAt(now)
+                .exportFileName(canonical.getExportFileName())
+                .approvalStatus(Boolean.TRUE.equals(canonical.getDraft()) ? ApprovalStatus.UNSUBMITTED : ApprovalStatus.IN_PROGRESS)
+                .squadCode(canonical.getTeamCode())
+                .formPayloadJson(writeJson(rawPayload))
+                .detailsPayloadJson(writeJson(rawPayload == null ? null : rawPayload.get("details")))
+                .summaryPayloadJson(writeJson(canonical.getSummaryPayload()))
+                .build();
+        Map<String, Map<String, String>> dictLabelMappings = resolveDictLabelMappings();
+        InspectionRecord exportRecord = buildExportRecord(canonical, persistenceRecord, request, dictLabelMappings);
+
+        Path storageDirectory = resolveStorageDirectory();
+        Path exported = excelExporter.export(exportRecord, storageDirectory);
+        if (!Files.exists(exported)) {
+            throw new IOException("妫€鏌ュ鍑烘枃浠舵湭鐢熸垚!");
+        }
+
+        overwriteExistingRecord(persistenceRecord);
+        saveDetailRows(persistenceRecord.getId(), canonical.getDetails(), now);
+        savePhotoRows(persistenceRecord.getId(), canonical.getPhotos(), now);
+        scheduleCleanupRemovedFiles(removedFileIds);
+        return exported;
+    }
+
+    private Set<Long> collectFileIds(List<PhotoItem> photos) {
+        if (photos == null || photos.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> ids = new LinkedHashSet<>();
+        for (PhotoItem photo : photos) {
+            if (photo == null || photo.getFileId() == null) {
+                continue;
+            }
+            ids.add(photo.getFileId());
+        }
+        return ids;
+    }
+
+    private Set<Long> resolveRemovedFileIds(Long recordId, Set<Long> retainedFileIds) {
+        if (recordId == null) {
+            return Collections.emptySet();
+        }
+        List<PhotoItem> existingPhotos = photoMapper.selectList(Wrappers.lambdaQuery(PhotoItem.class)
+                .eq(PhotoItem::getRecordId, recordId));
+        if (existingPhotos == null || existingPhotos.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> removed = new LinkedHashSet<>();
+        for (PhotoItem existingPhoto : existingPhotos) {
+            if (existingPhoto == null || existingPhoto.getFileId() == null) {
+                continue;
+            }
+            if (retainedFileIds == null || !retainedFileIds.contains(existingPhoto.getFileId())) {
+                removed.add(existingPhoto.getFileId());
+            }
+        }
+        return removed;
+    }
+
+    private void scheduleCleanupRemovedFiles(Set<Long> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return;
+        }
+        Set<Long> ids = new LinkedHashSet<>(fileIds);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cleanupRemovedFiles(ids);
+                }
+            });
+            return;
+        }
+        cleanupRemovedFiles(ids);
+    }
+
+    private void cleanupRemovedFiles(Set<Long> fileIds) {
+        for (Long fileId : fileIds) {
+            if (fileId == null || fileId <= 0) {
+                continue;
+            }
+            Long refCount = photoMapper.selectCount(Wrappers.lambdaQuery(PhotoItem.class)
+                    .eq(PhotoItem::getFileId, fileId));
+            if (refCount != null && refCount > 0) {
+                continue;
+            }
+            try {
+                sysFileService.softDelete(fileId, true);
+            } catch (Exception ex) {
+                log.warn("cleanup inspection file failed, fileId={}", fileId, ex);
+            }
+        }
     }
 
     private void overwriteExistingRecord(InspectionRecord persistenceRecord) {
@@ -151,6 +291,13 @@ public class InspectionLogSubmitExportService {
                 .last("LIMIT 1");
         List<InspectionRecord> records = recordMapper.selectList(query);
         return records == null || records.isEmpty() ? null : records.get(0);
+    }
+
+    private InspectionRecord findById(Long id) {
+        if (id == null || id <= 0) {
+            return null;
+        }
+        return recordMapper.selectById(id);
     }
 
     private String resolveCreatedBy(InspectionRecord existingRecord, String fallbackCreatedBy) {
