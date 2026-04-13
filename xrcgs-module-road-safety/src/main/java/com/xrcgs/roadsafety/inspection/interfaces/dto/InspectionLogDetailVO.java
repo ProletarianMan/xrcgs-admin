@@ -1,5 +1,6 @@
 package com.xrcgs.roadsafety.inspection.interfaces.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.xrcgs.common.enums.ApprovalStatus;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -12,15 +13,17 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class InspectionLogPageItemVO {
+public class InspectionLogDetailVO {
 
-    private String id;
+    private Long recordId;
 
     private LocalDate recordDate;
 
     private String squadCode;
 
+    private ApprovalStatus approvalStatus;
+
     private LocalDateTime createdAt;
 
-    private ApprovalStatus approvalStatus;
+    private JsonNode replayPayload;
 }

@@ -7,6 +7,7 @@ import com.xrcgs.common.core.R;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogApplicationService;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogQueryService;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogSubmitExportService;
+import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogDetailVO;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogPageItemVO;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitRequest;
@@ -52,12 +53,12 @@ public class InspectionLogController {
     private final Validator validator;
 
     /**
-     * 分页查询日志
-     * @param recordDate 日志日期
-     * @param squadCode 所属中队
+     * 查询日志列表
+     * @param recordDate 记录日期
+     * @param squadCode 中队范围
      * @param pageNo 当前页
      * @param pageSize 每页条数
-     * @return 分页数据列表
+     * @return
      */
     @GetMapping("/page")
     public R<Page<InspectionLogPageItemVO>> page(
@@ -69,6 +70,16 @@ public class InspectionLogController {
         return R.ok(queryService.page(recordDate, squadCode, pageNo, pageSize));
     }
 
+    /**
+     * 查询巡查日志详情
+     * @param id 日志ID
+     * @return
+     */
+    @GetMapping("/detail")
+    public R<InspectionLogDetailVO> detail(@RequestParam(name = "id") @Min(1) long id) {
+        return R.ok(queryService.detail(id));
+    }
+
     @PostMapping("/export")
     @OpLog("导出巡查日志")
     public void export(@Valid @RequestBody InspectionLogSubmitRequest request,
@@ -77,6 +88,12 @@ public class InspectionLogController {
         streamFile(exportFile, response);
     }
 
+    /**
+     * 提交巡查日志并导出
+     * @param payload 日志内容json格式
+     * @param response
+     * @throws IOException
+     */
     @PostMapping("/submit-export")
     @OpLog("提交导出巡查日志")
     public void submitExport(@RequestBody JsonNode payload, HttpServletResponse response) throws IOException {
