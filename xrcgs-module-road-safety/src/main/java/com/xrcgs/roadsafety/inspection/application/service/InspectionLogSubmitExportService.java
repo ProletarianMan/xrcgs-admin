@@ -26,14 +26,17 @@ import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportR
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest.MileageInfo;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogUpdateSubmitExportRequest;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,6 +44,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +55,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -69,6 +75,7 @@ public class InspectionLogSubmitExportService {
             DICT_ALL_SITE
     );
     private static final String INVALID_FILE_NAME_PATTERN = "[\\\\/:*?\"<>|]";
+    private static final Pattern FILE_ID_URL_PATTERN = Pattern.compile("/api/file/(?:preview|download)/(\\d+)");
 
     private final InspectionLogSubmitExportMapper mapper;
     private final InspectionRecordExcelExporter excelExporter;
@@ -112,7 +119,7 @@ public class InspectionLogSubmitExportService {
                 .exportedBy(canonical.getPatrolTeam())
                 .exportedAt(now)
                 .exportFileName(canonical.getExportFileName())
-                .approvalStatus(Boolean.TRUE.equals(canonical.getDraft()) ? ApprovalStatus.UNSUBMITTED : ApprovalStatus.IN_PROGRESS)
+                .approvalStatus(ApprovalStatus.UNSUBMITTED)
                 .squadCode(canonical.getTeamCode())
                 .formPayloadJson(writeJson(rawPayload))
                 .detailsPayloadJson(writeJson(rawPayload == null ? null : rawPayload.get("details")))
@@ -152,6 +159,81 @@ public class InspectionLogSubmitExportService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public Long submitWithoutExport(InspectionLogSubmitExportRequest request, JsonNode rawPayload, String storedFileName) {
+        CanonicalInspectionExportModel canonical = mapper.toCanonical(request, rawPayload);
+        LocalDateTime now = LocalDateTime.now();
+        InspectionRecord existingRecord = findLatestByDateAndSquad(canonical.getDate(), canonical.getTeamCode());
+        Set<Long> retainedFileIds = collectFileIds(canonical.getPhotos());
+        Set<Long> removedFileIds = Collections.emptySet();
+
+        String boundFileName = normalizeBoundFileName(storedFileName, canonical.getExportFileName());
+        InspectionRecord persistenceRecord = InspectionRecord.builder()
+                .id(existingRecord == null ? null : existingRecord.getId())
+                .date(canonical.getDate())
+                .unitName(canonical.getUnitName())
+                .weather(canonical.getWeather())
+                .patrolTeam(canonical.getPatrolTeam())
+                .patrolVehicle(canonical.getPatrolVehicle())
+                .location(canonical.getLocation())
+                .inspectionContent(canonical.getInspectionContent())
+                .issuesFound(canonical.getIssuesFound())
+                .handlingSituationRaw(canonical.getHandlingSituationRaw())
+                .handlingDetails(canonical.getHandlingGroup())
+                .photos(Optional.ofNullable(canonical.getPhotos()).orElse(Collections.emptyList()))
+                .handoverSummary(canonical.getHandoverSummary())
+                .remark(canonical.getRemark())
+                .createdBy(resolveCreatedBy(existingRecord, canonical.getPatrolTeam()))
+                .createdAt(resolveCreatedAt(existingRecord, now))
+                .updatedAt(now)
+                .exportedBy(canonical.getPatrolTeam())
+                .exportedAt(now)
+                .exportFileName(boundFileName)
+                .approvalStatus(ApprovalStatus.UNSUBMITTED)
+                .squadCode(canonical.getTeamCode())
+                .formPayloadJson(writeJson(rawPayload))
+                .detailsPayloadJson(writeJson(rawPayload == null ? null : rawPayload.get("details")))
+                .summaryPayloadJson(writeJson(canonical.getSummaryPayload()))
+                .build();
+
+        if (existingRecord == null) {
+            try {
+                recordMapper.insert(persistenceRecord);
+            } catch (DuplicateKeyException ex) {
+                InspectionRecord latestRecord = findLatestByDateAndSquad(canonical.getDate(), canonical.getTeamCode());
+                if (latestRecord == null || latestRecord.getId() == null) {
+                    throw ex;
+                }
+                persistenceRecord.setId(latestRecord.getId());
+                persistenceRecord.setCreatedBy(resolveCreatedBy(latestRecord, canonical.getPatrolTeam()));
+                persistenceRecord.setCreatedAt(resolveCreatedAt(latestRecord, now));
+                removedFileIds = resolveRemovedFileIds(persistenceRecord.getId(), retainedFileIds);
+                overwriteExistingRecord(persistenceRecord);
+            }
+        } else {
+            removedFileIds = resolveRemovedFileIds(persistenceRecord.getId(), retainedFileIds);
+            overwriteExistingRecord(persistenceRecord);
+        }
+
+        saveDetailRows(persistenceRecord.getId(), canonical.getDetails(), now);
+        savePhotoRows(persistenceRecord.getId(), canonical.getPhotos(), now);
+        scheduleCleanupRemovedFiles(removedFileIds);
+        return persistenceRecord.getId();
+    }
+
+    public Path storeUploadedOriginalFile(MultipartFile file, String preferredFileName) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("uploaded file is empty");
+        }
+        Path storageDirectory = resolveStorageDirectory();
+        String fileName = buildStoredOriginalFileName(file.getOriginalFilename(), preferredFileName);
+        Path target = resolveUniqueFilePath(storageDirectory, fileName);
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return target;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public Path updateAndExportById(InspectionLogUpdateSubmitExportRequest request, JsonNode rawPayload) throws IOException {
         CanonicalInspectionExportModel canonical = mapper.toCanonical(request, rawPayload);
         LocalDateTime now = LocalDateTime.now();
@@ -183,7 +265,7 @@ public class InspectionLogSubmitExportService {
                 .exportedBy(canonical.getPatrolTeam())
                 .exportedAt(now)
                 .exportFileName(canonical.getExportFileName())
-                .approvalStatus(Boolean.TRUE.equals(canonical.getDraft()) ? ApprovalStatus.UNSUBMITTED : ApprovalStatus.IN_PROGRESS)
+                .approvalStatus(ApprovalStatus.UNSUBMITTED)
                 .squadCode(canonical.getTeamCode())
                 .formPayloadJson(writeJson(rawPayload))
                 .detailsPayloadJson(writeJson(rawPayload == null ? null : rawPayload.get("details")))
@@ -253,6 +335,12 @@ public class InspectionLogSubmitExportService {
         return files;
     }
 
+    @Transactional(readOnly = true)
+    public Long resolveLatestRecordId(LocalDate date, String squadCode) {
+        InspectionRecord record = findLatestByDateAndSquad(date, squadCode);
+        return record == null ? null : record.getId();
+    }
+
     private void deleteOneById(Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("inspection record id is invalid: " + id);
@@ -263,6 +351,7 @@ public class InspectionLogSubmitExportService {
         }
 
         Set<Long> relatedFileIds = collectRelatedFileIds(id);
+        relatedFileIds.addAll(collectRelatedFileIdsFromPayload(existingRecord));
         deleteDetailRows(id);
         deletePhotoRows(id);
         int deletedRows = recordMapper.deleteById(id);
@@ -331,6 +420,86 @@ public class InspectionLogSubmitExportService {
         return collectFileIds(photos);
     }
 
+    private Set<Long> collectRelatedFileIdsFromPayload(InspectionRecord record) {
+        if (record == null) {
+            return Collections.emptySet();
+        }
+        Set<Long> fileIds = new LinkedHashSet<>();
+        collectFileIdsFromPayload(record.getFormPayloadJson(), fileIds);
+        collectFileIdsFromPayload(record.getDetailsPayloadJson(), fileIds);
+        return fileIds;
+    }
+
+    private void collectFileIdsFromPayload(String payload, Set<Long> output) {
+        if (!StringUtils.hasText(payload) || output == null) {
+            return;
+        }
+        try {
+            JsonNode root = objectMapper.readTree(payload);
+            collectFileIdsFromJsonNode(root, output);
+        } catch (Exception ex) {
+            log.debug("parse inspection payload for file ids failed", ex);
+            collectFileIdsByUrlPattern(payload, output);
+        }
+    }
+
+    private void collectFileIdsFromJsonNode(JsonNode node, Set<Long> output) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (node.isArray()) {
+            for (JsonNode child : node) {
+                collectFileIdsFromJsonNode(child, output);
+            }
+            return;
+        }
+        if (node.isObject()) {
+            Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> field = fields.next();
+                String fieldName = field.getKey();
+                JsonNode value = field.getValue();
+                if (value == null || value.isNull()) {
+                    continue;
+                }
+                if (("fileId".equalsIgnoreCase(fieldName) || "file_id".equalsIgnoreCase(fieldName))
+                        && value.canConvertToLong()) {
+                    Long fileId = value.longValue();
+                    if (fileId != null && fileId > 0) {
+                        output.add(fileId);
+                    }
+                    continue;
+                }
+                if (value.isTextual()) {
+                    collectFileIdsByUrlPattern(value.asText(), output);
+                    continue;
+                }
+                collectFileIdsFromJsonNode(value, output);
+            }
+            return;
+        }
+        if (node.isTextual()) {
+            collectFileIdsByUrlPattern(node.asText(), output);
+        }
+    }
+
+    private void collectFileIdsByUrlPattern(String text, Set<Long> output) {
+        if (!StringUtils.hasText(text) || output == null) {
+            return;
+        }
+        Matcher matcher = FILE_ID_URL_PATTERN.matcher(text);
+        while (matcher.find()) {
+            try {
+                Long fileId = Long.valueOf(matcher.group(1));
+                if (fileId > 0) {
+                    output.add(fileId);
+                }
+            } catch (NumberFormatException ignored) {
+                // skip invalid file id segments
+            }
+        }
+    }
+
     private void deleteRelatedPhotoFiles(Set<Long> fileIds) {
         if (fileIds == null || fileIds.isEmpty()) {
             return;
@@ -348,6 +517,10 @@ public class InspectionLogSubmitExportService {
                 boolean deleted = sysFileService.softDelete(fileId, true);
                 if (!deleted) {
                     throw new IllegalStateException("delete inspection photo failed, fileId=" + fileId);
+                }
+                boolean removed = sysFileService.removeById(fileId);
+                if (!removed) {
+                    log.warn("delete sys_file row skipped or already removed, fileId={}", fileId);
                 }
             } catch (Exception ex) {
                 throw new IllegalStateException("delete inspection photo failed, fileId=" + fileId, ex);
@@ -389,8 +562,60 @@ public class InspectionLogSubmitExportService {
         if (!StringUtils.hasText(fileName)) {
             return DEFAULT_EXPORT_FILE_NAME;
         }
-        String normalized = fileName.trim();
-        return normalized.toLowerCase(Locale.ROOT).endsWith(".xlsx") ? normalized : normalized + ".xlsx";
+        String normalized = fileName.trim().replaceAll(INVALID_FILE_NAME_PATTERN, "_");
+        if (!StringUtils.hasText(normalized)) {
+            return DEFAULT_EXPORT_FILE_NAME;
+        }
+        if (normalized.lastIndexOf('.') <= 0 || normalized.endsWith(".")) {
+            return normalized + ".xlsx";
+        }
+        return normalized;
+    }
+
+    private String normalizeBoundFileName(String storedFileName, String fallbackName) {
+        if (StringUtils.hasText(storedFileName)) {
+            return normalizeExportFileName(storedFileName);
+        }
+        return normalizeExportFileName(fallbackName);
+    }
+
+    private String buildStoredOriginalFileName(String originalName, String preferredFileName) {
+        String candidate = StringUtils.hasText(originalName) ? originalName.trim() : trimToNull(preferredFileName);
+        if (!StringUtils.hasText(candidate)) {
+            candidate = "inspection_import_" + LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".xlsx";
+        }
+        String normalized = candidate.replaceAll(INVALID_FILE_NAME_PATTERN, "_");
+        if (!StringUtils.hasText(normalized)) {
+            return DEFAULT_EXPORT_FILE_NAME;
+        }
+        if (normalized.lastIndexOf('.') <= 0 || normalized.endsWith(".")) {
+            return normalized + ".xlsx";
+        }
+        return normalized;
+    }
+
+    private Path resolveUniqueFilePath(Path directory, String fileName) throws IOException {
+        Path normalizedDir = directory.toAbsolutePath().normalize();
+        String baseName = normalizeExportFileName(fileName);
+        String stem = baseName;
+        String ext = "";
+        int dotIndex = baseName.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < baseName.length() - 1) {
+            stem = baseName.substring(0, dotIndex);
+            ext = baseName.substring(dotIndex);
+        }
+        int suffix = 0;
+        while (true) {
+            String candidate = suffix == 0 ? stem + ext : stem + "_" + suffix + ext;
+            Path target = normalizedDir.resolve(candidate).toAbsolutePath().normalize();
+            if (!target.startsWith(normalizedDir)) {
+                throw new IOException("stored file path is invalid: " + candidate);
+            }
+            if (!Files.exists(target)) {
+                return target;
+            }
+            suffix++;
+        }
     }
 
     private Set<Long> resolveRemovedFileIds(Long recordId, Set<Long> retainedFileIds) {
@@ -442,7 +667,10 @@ public class InspectionLogSubmitExportService {
                 continue;
             }
             try {
-                sysFileService.softDelete(fileId, true);
+                boolean deleted = sysFileService.softDelete(fileId, true);
+                if (deleted) {
+                    sysFileService.removeById(fileId);
+                }
             } catch (Exception ex) {
                 log.warn("cleanup inspection file failed, fileId={}", fileId, ex);
             }
@@ -503,7 +731,10 @@ public class InspectionLogSubmitExportService {
                 .weather(resolveRequiredLabel(dictLabelMappings, DICT_WEATHERS, request.getWeather(), "天气"))
                 .patrolTeam(canonical.getPatrolTeam())
                 .patrolVehicle(resolveRequiredLabel(dictLabelMappings, DICT_OFFICIAL_VEHICLES, request.getVehicle(), "巡查车辆"))
-                .location(canonical.getLocation())
+                .location(joinLocationDisplay(
+                        resolveRouteDisplay(dictLabelMappings, request.getRoutes()),
+                        buildMileageDisplay(request.getMileage()),
+                        canonical.getLocation()))
                 .routeDisplay(resolveRouteDisplay(dictLabelMappings, request.getRoutes()))
                 .mileageDisplay(buildMileageDisplay(request.getMileage()))
                 .handoverFromDisplay(buildPeopleDisplay(Optional.ofNullable(request.getHandover())
@@ -527,6 +758,36 @@ public class InspectionLogSubmitExportService {
                 .exportedAt(persistenceRecord.getExportedAt())
                 .exportFileName(canonical.getExportFileName())
                 .build();
+    }
+
+    /*
+    private String joinLocationDisplay(String routeDisplay, String mileageDisplay, String fallbackLocation) {
+        List<String> parts = new ArrayList<>();
+        if (StringUtils.hasText(routeDisplay)) {
+            parts.add(routeDisplay.trim());
+        }
+        if (StringUtils.hasText(mileageDisplay)) {
+            parts.add(mileageDisplay.trim());
+        }
+        if (!parts.isEmpty()) {
+            return String.join("，", parts);
+        }
+        return fallbackLocation;
+    }
+    */
+
+    private String joinLocationDisplay(String routeDisplay, String mileageDisplay, String fallbackLocation) {
+        List<String> parts = new ArrayList<>();
+        if (StringUtils.hasText(routeDisplay)) {
+            parts.add(routeDisplay.trim());
+        }
+        if (StringUtils.hasText(mileageDisplay)) {
+            parts.add(mileageDisplay.trim());
+        }
+        if (!parts.isEmpty()) {
+            return String.join("\uFF0C", parts);
+        }
+        return fallbackLocation;
     }
 
     private Map<String, Map<String, String>> resolveDictLabelMappings() {
@@ -590,6 +851,7 @@ public class InspectionLogSubmitExportService {
         }
     }
 
+    /*
     private String resolveRouteDisplay(Map<String, Map<String, String>> dictLabelMappings, List<String> routes) {
         if (routes == null || routes.isEmpty()) {
             return null;
@@ -619,6 +881,37 @@ public class InspectionLogSubmitExportService {
         return label.trim();
     }
 
+    */
+
+    private String resolveRouteDisplay(Map<String, Map<String, String>> dictLabelMappings, List<String> routes) {
+        if (routes == null || routes.isEmpty()) {
+            return null;
+        }
+        List<String> labels = new ArrayList<>();
+        for (String routeCode : routes) {
+            labels.add(resolveRequiredLabel(dictLabelMappings, DICT_ALL_SITE, routeCode, "route"));
+        }
+        return String.join("\u3001", labels);
+    }
+
+    private String resolveRequiredLabel(Map<String, Map<String, String>> dictLabelMappings,
+                                        String typeCode,
+                                        String value,
+                                        String fieldName) {
+        if (!StringUtils.hasText(value)) {
+            throw new IllegalArgumentException("export failed: " + fieldName + " is blank");
+        }
+        String normalized = value.trim();
+        String label = Optional.ofNullable(dictLabelMappings.get(typeCode))
+                .map(mapping -> mapping.get(normalized))
+                .orElse(null);
+        if (!StringUtils.hasText(label)) {
+            throw new IllegalArgumentException("export failed: dictionary value is missing, typeCode="
+                    + typeCode + ", value=" + normalized);
+        }
+        return label.trim();
+    }
+
     private String resolveOptionalLabel(Map<String, Map<String, String>> dictLabelMappings,
                                         String typeCode,
                                         String value,
@@ -629,24 +922,35 @@ public class InspectionLogSubmitExportService {
         return resolveRequiredLabel(dictLabelMappings, typeCode, value, fieldName);
     }
 
+    /*
     private String buildMileageDisplay(Mileage mileage) {
         if (mileage == null) {
             return null;
         }
         List<String> segments = new ArrayList<>();
         double totalKm = 0d;
-        if (hasMileageInput(mileage.getDay())) {
+        boolean hasStructuredSegment = false;
+        if (hasStructuredMileageInput(mileage.getDay())) {
             MileageInfo day = mileage.getDay();
             segments.add("白班:" + formatMileageInfo(day, "白班"));
             totalKm += day.getTotalKm();
+            hasStructuredSegment = true;
+        } else if (hasDisplayOnlyMileageInput(mileage.getDay())) {
+            segments.add("白班:" + mileage.getDay().getDisplayText().trim());
         }
-        if (hasMileageInput(mileage.getNight())) {
+        if (hasStructuredMileageInput(mileage.getNight())) {
             MileageInfo night = mileage.getNight();
             segments.add("夜班:" + formatMileageInfo(night, "夜班"));
             totalKm += night.getTotalKm();
+            hasStructuredSegment = true;
+        } else if (hasDisplayOnlyMileageInput(mileage.getNight())) {
+            segments.add("夜班:" + mileage.getNight().getDisplayText().trim());
         }
         if (segments.isEmpty()) {
             return null;
+        }
+        if (!hasStructuredSegment) {
+            return String.join("；", segments);
         }
         return String.join("；", segments)
                 + "（总计" + String.format(Locale.ROOT, "%.3f", totalKm) + "KM）";
@@ -664,13 +968,67 @@ public class InspectionLogSubmitExportService {
         return startStake + "–" + endStake;
     }
 
-    private boolean hasMileageInput(MileageInfo info) {
+    */
+
+    private String buildMileageDisplay(Mileage mileage) {
+        if (mileage == null) {
+            return null;
+        }
+        List<String> segments = new ArrayList<>();
+        double totalKm = 0d;
+        boolean hasStructuredSegment = false;
+        if (hasStructuredMileageInput(mileage.getDay())) {
+            MileageInfo day = mileage.getDay();
+            segments.add("\u767D\u73ED:" + formatMileageInfo(day, "\u767D\u73ED"));
+            totalKm += day.getTotalKm();
+            hasStructuredSegment = true;
+        } else if (hasDisplayOnlyMileageInput(mileage.getDay())) {
+            segments.add("\u767D\u73ED:" + mileage.getDay().getDisplayText().trim());
+        }
+        if (hasStructuredMileageInput(mileage.getNight())) {
+            MileageInfo night = mileage.getNight();
+            segments.add("\u591C\u73ED:" + formatMileageInfo(night, "\u591C\u73ED"));
+            totalKm += night.getTotalKm();
+            hasStructuredSegment = true;
+        } else if (hasDisplayOnlyMileageInput(mileage.getNight())) {
+            segments.add("\u591C\u73ED:" + mileage.getNight().getDisplayText().trim());
+        }
+        if (segments.isEmpty()) {
+            return null;
+        }
+        if (!hasStructuredSegment) {
+            return String.join("\uFF1B", segments);
+        }
+        return String.join("\uFF1B", segments)
+                + "\uFF08\u603B\u8BA1" + String.format(Locale.ROOT, "%.3f", totalKm) + "KM\uFF09";
+    }
+
+    private String formatMileageInfo(MileageInfo info, String shiftName) {
+        String startStake = trimToNull(info.getStartStake());
+        String endStake = trimToNull(info.getEndStake());
+        if (startStake == null || endStake == null) {
+            throw new IllegalArgumentException("export failed, " + shiftName + " mileage stake is incomplete");
+        }
+        if (info.getTotalKm() == null) {
+            throw new IllegalArgumentException("export failed, " + shiftName + " mileage total is missing");
+        }
+        return startStake + "-" + endStake;
+    }
+
+    private boolean hasStructuredMileageInput(MileageInfo info) {
         if (info == null) {
             return false;
         }
         return StringUtils.hasText(info.getStartStake())
                 || StringUtils.hasText(info.getEndStake())
                 || info.getTotalKm() != null;
+    }
+
+    private boolean hasDisplayOnlyMileageInput(MileageInfo info) {
+        if (info == null) {
+            return false;
+        }
+        return !hasStructuredMileageInput(info) && StringUtils.hasText(info.getDisplayText());
     }
 
     private String trimToNull(String value) {
@@ -680,6 +1038,7 @@ public class InspectionLogSubmitExportService {
         return value.trim();
     }
 
+    /*
     private String buildPeopleDisplay(List<String> values) {
         if (values == null || values.isEmpty()) {
             return null;
@@ -714,6 +1073,49 @@ public class InspectionLogSubmitExportService {
             blocks.add("送达" + Optional.ofNullable(number).orElse("")
                     + "号《工作联系单》" + System.lineSeparator()
                     + "被送达单位：" + Optional.ofNullable(unit).orElse(""));
+        }
+        if (blocks.isEmpty()) {
+            return null;
+        }
+        return String.join(System.lineSeparator(), blocks);
+    }
+
+    */
+
+    private String buildPeopleDisplay(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String value : values) {
+            if (!StringUtils.hasText(value)) {
+                continue;
+            }
+            normalized.add(value.trim());
+        }
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        return String.join("\u3001", normalized);
+    }
+
+    private String buildDeliveryContactDisplay(List<Delivery> deliveries) {
+        if (deliveries == null || deliveries.isEmpty()) {
+            return null;
+        }
+        List<String> blocks = new ArrayList<>();
+        for (Delivery delivery : deliveries) {
+            if (delivery == null) {
+                continue;
+            }
+            String number = trimToNull(delivery.getNumber());
+            String unit = trimToNull(delivery.getUnit());
+            if (number == null && unit == null) {
+                continue;
+            }
+            blocks.add("\u9001\u8FBE" + Optional.ofNullable(number).orElse("")
+                    + "\u53F7\u300A\u5DE5\u4F5C\u8054\u7CFB\u5355\u300B" + System.lineSeparator()
+                    + "\u88AB\u9001\u8FBE\u5355\u4F4D\uFF1A" + Optional.ofNullable(unit).orElse(""));
         }
         if (blocks.isEmpty()) {
             return null;

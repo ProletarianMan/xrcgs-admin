@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.core.R;
+import com.xrcgs.roadsafety.inspection.application.service.InspectionLogImportService;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogQueryService;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogSubmitExportService;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogDetailVO;
@@ -16,6 +17,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
@@ -41,7 +43,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/road-safety/inspection/logs")
@@ -54,13 +58,14 @@ public class InspectionLogController {
 
     private final InspectionLogQueryService queryService;
     private final InspectionLogSubmitExportService submitExportService;
+    private final InspectionLogImportService importService;
     private final ObjectMapper objectMapper;
     private final Validator validator;
 
     /**
-     * 查询日志列表
-     * @param recordDate 记录日期
-     * @param squadCode 中队范围
+     * 分页查询巡查日志
+     * @param recordDate 日志日期
+     * @param squadCode 所属中队
      * @param pageNo 当前页
      * @param pageSize 每页条数
      * @return
@@ -76,7 +81,7 @@ public class InspectionLogController {
     }
 
     /**
-     * 查询巡查日志详情
+     * 获取日志详细信息
      * @param id 日志ID
      * @return
      */
@@ -85,24 +90,32 @@ public class InspectionLogController {
         return R.ok(queryService.detail(id));
     }
 
+    /**
+     * 批量导出日志
+     * @param ids 要导出的ID集合
+     * @param response 返回ZIP文件
+     * @throws IOException
+     */
     @PostMapping("/export")
-    @OpLog("导出巡查日志")
+    @OpLog("批量导出日志")
     public void export(@RequestBody @NotEmpty List<@NotNull @Min(1) Long> ids,
                        HttpServletResponse response) throws IOException {
-        List<InspectionLogSubmitExportService.ExportFileResource> exportFiles = submitExportService.resolveExportFilesByIds(ids);
+        List<InspectionLogSubmitExportService.ExportFileResource> exportFiles =
+                submitExportService.resolveExportFilesByIds(ids);
         streamZip(exportFiles, response);
     }
 
     /**
-     * 提交巡查日志并导出
-     * @param payload 日志内容json格式
-     * @param response
+     * 提交和导出日志
+     * @param payload 日志内容
+     * @param response 日志文件
      * @throws IOException
      */
     @PostMapping("/submit-export")
-    @OpLog("提交导出巡查日志")
+    @OpLog("提交和导出日志")
     public void submitExport(@RequestBody JsonNode payload, HttpServletResponse response) throws IOException {
-        InspectionLogSubmitExportRequest request = objectMapper.treeToValue(payload, InspectionLogSubmitExportRequest.class);
+        InspectionLogSubmitExportRequest request =
+                objectMapper.treeToValue(payload, InspectionLogSubmitExportRequest.class);
         Set<ConstraintViolation<InspectionLogSubmitExportRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
@@ -112,15 +125,34 @@ public class InspectionLogController {
     }
 
     /**
-     * 修改巡查日志
+     * 导入和解析文件
+     * @param file 导入文件
+     * @param team
+     * @param draft
+     * @return
+     * @throws IOException
+     */
+    @PostMapping(value = "/submit-import", consumes = "multipart/form-data")
+    @OpLog("导入解析日志")
+    public R<InspectionLogDetailVO> submitImport(@RequestPart("file") MultipartFile file,
+                                                 @RequestParam("team") @NotBlank String team,
+                                                 @RequestParam(name = "draft", required = false) Boolean draft)
+            throws IOException {
+        Long recordId = importService.importAndSubmit(file, team, draft);
+        return R.ok(queryService.detail(recordId));
+    }
+
+    /**
+     * 更新日志内容
      * @param payload 日志内容
      * @param response
      * @throws IOException
      */
     @PostMapping("/update")
-    @OpLog("修改巡查日志数据")
+    @OpLog("更新日志")
     public void update(@RequestBody JsonNode payload, HttpServletResponse response) throws IOException {
-        InspectionLogUpdateSubmitExportRequest request = objectMapper.treeToValue(payload, InspectionLogUpdateSubmitExportRequest.class);
+        InspectionLogUpdateSubmitExportRequest request =
+                objectMapper.treeToValue(payload, InspectionLogUpdateSubmitExportRequest.class);
         Set<ConstraintViolation<InspectionLogUpdateSubmitExportRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
@@ -130,12 +162,12 @@ public class InspectionLogController {
     }
 
     /**
-     * 删除巡查日志
-     * @param ids 日志ID
+     * 批量删除日志
+     * @param ids 要删除的日志ID
      * @return
      */
     @PostMapping("/delete")
-    @OpLog("删除巡查日志")
+    @OpLog("删除日志")
     public R<Boolean> delete(@RequestBody @NotEmpty List<@NotNull @Min(1) Long> ids) {
         submitExportService.deleteByIds(ids);
         return R.ok(true);

@@ -475,6 +475,54 @@ class InspectionLogSubmitExportServiceTest {
     }
 
     @Test
+    void shouldDeleteRelatedFilesFromPayloadWhenPhotoRowsMissing() throws Exception {
+        Long recordId = 502L;
+        Path exportFile = tempDir.resolve("delete-from-payload.xlsx");
+        Files.writeString(exportFile, "to-delete");
+
+        InspectionRecord existing = new InspectionRecord();
+        existing.setId(recordId);
+        existing.setExportFileName("delete-from-payload.xlsx");
+        existing.setFormPayloadJson("""
+                {
+                  "details": [
+                    {
+                      "photos": [
+                        {"url":"/api/file/preview/9101"},
+                        {"url":"https://example.com/api/file/download/9102?token=abc"}
+                      ]
+                    }
+                  ]
+                }
+                """);
+        existing.setDetailsPayloadJson("""
+                [
+                  {
+                    "photos": [
+                      {"fileId": 9103}
+                    ]
+                  }
+                ]
+                """);
+
+        when(recordMapper.selectById(recordId)).thenReturn(existing);
+        when(photoMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(recordMapper.deleteById(recordId)).thenReturn(1);
+        when(photoMapper.selectCount(any())).thenReturn(0L, 0L, 0L);
+        when(sysFileService.softDelete(9101L, true)).thenReturn(true);
+        when(sysFileService.softDelete(9102L, true)).thenReturn(true);
+        when(sysFileService.softDelete(9103L, true)).thenReturn(true);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+
+        service.deleteById(recordId);
+
+        verify(sysFileService).softDelete(9101L, true);
+        verify(sysFileService).softDelete(9102L, true);
+        verify(sysFileService).softDelete(9103L, true);
+        assertThat(Files.exists(exportFile)).isFalse();
+    }
+
+    @Test
     void shouldFailDeleteWhenExportFileCannotBeRemoved() throws Exception {
         Long recordId = 501L;
         Path exportPath = tempDir.resolve("delete-broken.xlsx");
