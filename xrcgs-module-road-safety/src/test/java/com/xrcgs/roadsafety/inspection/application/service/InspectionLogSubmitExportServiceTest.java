@@ -368,6 +368,81 @@ class InspectionLogSubmitExportServiceTest {
     }
 
     @Test
+    void shouldResolveExportFilesByIdsInInputOrder() throws Exception {
+        Path firstFile = tempDir.resolve("export-600.xlsx");
+        Path secondFile = tempDir.resolve("export-601.xlsx");
+        Files.writeString(firstFile, "f1");
+        Files.writeString(secondFile, "f2");
+
+        InspectionRecord firstRecord = new InspectionRecord();
+        firstRecord.setId(600L);
+        firstRecord.setExportFileName("export-600.xlsx");
+
+        InspectionRecord secondRecord = new InspectionRecord();
+        secondRecord.setId(601L);
+        secondRecord.setExportFileName("export-601.xlsx");
+
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+        when(recordMapper.selectBatchIds(List.of(600L, 601L))).thenReturn(List.of(secondRecord, firstRecord));
+
+        List<InspectionLogSubmitExportService.ExportFileResource> files = service.resolveExportFilesByIds(List.of(600L, 601L));
+
+        assertThat(files).hasSize(2);
+        assertThat(files.get(0).recordId()).isEqualTo(600L);
+        assertThat(files.get(0).filePath()).isEqualTo(firstFile);
+        assertThat(files.get(0).entryName()).startsWith("600_");
+        assertThat(files.get(1).recordId()).isEqualTo(601L);
+        assertThat(files.get(1).filePath()).isEqualTo(secondFile);
+        assertThat(files.get(1).entryName()).startsWith("601_");
+    }
+
+    @Test
+    void shouldFailResolveExportFilesByIdsWhenRecordMissing() {
+        InspectionRecord firstRecord = new InspectionRecord();
+        firstRecord.setId(700L);
+        firstRecord.setExportFileName("export-700.xlsx");
+
+        when(recordMapper.selectBatchIds(List.of(700L, 701L))).thenReturn(List.of(firstRecord));
+
+        assertThatThrownBy(() -> service.resolveExportFilesByIds(List.of(700L, 701L)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("inspection record not found")
+                .hasMessageContaining("701");
+    }
+
+    @Test
+    void shouldDeleteRecordsByIdsInBatch() throws Exception {
+        Long firstId = 800L;
+        Long secondId = 801L;
+        Path firstExportFile = tempDir.resolve("delete-800.xlsx");
+        Path secondExportFile = tempDir.resolve("delete-801.xlsx");
+        Files.writeString(firstExportFile, "to-delete-800");
+        Files.writeString(secondExportFile, "to-delete-801");
+
+        InspectionRecord firstRecord = new InspectionRecord();
+        firstRecord.setId(firstId);
+        firstRecord.setExportFileName("delete-800.xlsx");
+
+        InspectionRecord secondRecord = new InspectionRecord();
+        secondRecord.setId(secondId);
+        secondRecord.setExportFileName("delete-801.xlsx");
+
+        when(recordMapper.selectById(firstId)).thenReturn(firstRecord);
+        when(recordMapper.selectById(secondId)).thenReturn(secondRecord);
+        when(photoMapper.selectList(any())).thenReturn(Collections.emptyList());
+        when(recordMapper.deleteById(firstId)).thenReturn(1);
+        when(recordMapper.deleteById(secondId)).thenReturn(1);
+        when(logProperties.getInspectionLog()).thenReturn(tempDir.toString());
+
+        service.deleteByIds(List.of(firstId, secondId));
+
+        verify(recordMapper).deleteById(firstId);
+        verify(recordMapper).deleteById(secondId);
+        assertThat(Files.exists(firstExportFile)).isFalse();
+        assertThat(Files.exists(secondExportFile)).isFalse();
+    }
+
+    @Test
     void shouldDeleteRecordAndRelatedResourcesById() throws Exception {
         Long recordId = 500L;
         Path exportFile = tempDir.resolve("delete-log.xlsx");

@@ -4,21 +4,20 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xrcgs.common.core.R;
-import com.xrcgs.roadsafety.inspection.application.service.InspectionLogApplicationService;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogQueryService;
 import com.xrcgs.roadsafety.inspection.application.service.InspectionLogSubmitExportService;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogDetailVO;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogPageItemVO;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitExportRequest;
-import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogSubmitRequest;
 import com.xrcgs.roadsafety.inspection.interfaces.dto.InspectionLogUpdateSubmitExportRequest;
 import com.xrcgs.syslog.annotation.OpLog;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
-import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -26,7 +25,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,8 +50,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class InspectionLogController {
 
     private static final Logger log = LoggerFactory.getLogger(InspectionLogController.class);
+    private static final DateTimeFormatter ZIP_NAME_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
-    private final InspectionLogApplicationService applicationService;
     private final InspectionLogQueryService queryService;
     private final InspectionLogSubmitExportService submitExportService;
     private final ObjectMapper objectMapper;
@@ -83,10 +87,10 @@ public class InspectionLogController {
 
     @PostMapping("/export")
     @OpLog("导出巡查日志")
-    public void export(@Valid @RequestBody InspectionLogSubmitRequest request,
+    public void export(@RequestBody @NotEmpty List<@NotNull @Min(1) Long> ids,
                        HttpServletResponse response) throws IOException {
-        Path exportFile = applicationService.generateInspectionLog(request);
-        streamFile(exportFile, response);
+        List<InspectionLogSubmitExportService.ExportFileResource> exportFiles = submitExportService.resolveExportFilesByIds(ids);
+        streamZip(exportFiles, response);
     }
 
     /**
@@ -127,14 +131,55 @@ public class InspectionLogController {
 
     /**
      * 删除巡查日志
-     * @param id 日志ID
+     * @param ids 日志ID
      * @return
      */
     @PostMapping("/delete")
     @OpLog("删除巡查日志")
-    public R<Boolean> delete(@RequestParam(name = "id") @Min(1) long id) {
-        submitExportService.deleteById(id);
+    public R<Boolean> delete(@RequestBody @NotEmpty List<@NotNull @Min(1) Long> ids) {
+        submitExportService.deleteByIds(ids);
         return R.ok(true);
+    }
+
+    private void streamZip(List<InspectionLogSubmitExportService.ExportFileResource> exportFiles,
+                           HttpServletResponse response) throws IOException {
+        String zipName = "inspection_logs_" + LocalDateTime.now().format(ZIP_NAME_TIME_FORMATTER) + ".zip";
+        String encodedName = URLEncoder.encode(zipName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType("application/zip");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + encodedName
+                + "\"; filename*=utf-8''" + encodedName);
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Expires", "0");
+
+        byte[] buffer = new byte[8192];
+        try (ZipOutputStream zipOutputStream = new ZipOutputStream(response.getOutputStream())) {
+            for (InspectionLogSubmitExportService.ExportFileResource exportFile : exportFiles) {
+                ZipEntry zipEntry = new ZipEntry(exportFile.entryName());
+                zipEntry.setTime(System.currentTimeMillis());
+                boolean entryOpened = false;
+                try {
+                    zipOutputStream.putNextEntry(zipEntry);
+                    entryOpened = true;
+                    try (InputStream inputStream = Files.newInputStream(exportFile.filePath())) {
+                        int read;
+                        while ((read = inputStream.read(buffer)) != -1) {
+                            zipOutputStream.write(buffer, 0, read);
+                        }
+                    }
+                } finally {
+                    if (entryOpened) {
+                        zipOutputStream.closeEntry();
+                    }
+                }
+            }
+            zipOutputStream.finish();
+            response.flushBuffer();
+        } catch (IOException ex) {
+            log.error("inspection logs batch export failed", ex);
+            throw ex;
+        }
     }
 
     private void streamFile(Path exportFile, HttpServletResponse response) throws IOException {

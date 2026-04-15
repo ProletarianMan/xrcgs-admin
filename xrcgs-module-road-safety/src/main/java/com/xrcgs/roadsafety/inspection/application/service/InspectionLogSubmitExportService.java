@@ -68,6 +68,7 @@ public class InspectionLogSubmitExportService {
             DICT_OFFICIAL_VEHICLES,
             DICT_ALL_SITE
     );
+    private static final String INVALID_FILE_NAME_PATTERN = "[\\\\/:*?\"<>|]";
 
     private final InspectionLogSubmitExportMapper mapper;
     private final InspectionRecordExcelExporter excelExporter;
@@ -79,6 +80,9 @@ public class InspectionLogSubmitExportService {
     private final DictService dictService;
     private final AuthCacheService authCacheService;
     private final SysFileService sysFileService;
+
+    public record ExportFileResource(Long recordId, String entryName, Path filePath) {
+    }
 
     @Transactional(rollbackFor = Exception.class)
     public Path submitAndExport(InspectionLogSubmitExportRequest request, JsonNode rawPayload) throws IOException {
@@ -203,6 +207,53 @@ public class InspectionLogSubmitExportService {
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteById(Long id) {
+        deleteOneById(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteByIds(List<Long> ids) {
+        for (Long id : normalizeRecordIds(ids)) {
+            deleteOneById(id);
+        }
+    }
+
+    public List<ExportFileResource> resolveExportFilesByIds(List<Long> ids) {
+        List<Long> normalizedIds = normalizeRecordIds(ids);
+        List<InspectionRecord> records = recordMapper.selectBatchIds(normalizedIds);
+        Map<Long, InspectionRecord> recordById = new LinkedHashMap<>();
+        if (records != null) {
+            for (InspectionRecord record : records) {
+                if (record == null || record.getId() == null) {
+                    continue;
+                }
+                recordById.put(record.getId(), record);
+            }
+        }
+        List<Long> missingIds = new ArrayList<>();
+        for (Long id : normalizedIds) {
+            if (!recordById.containsKey(id)) {
+                missingIds.add(id);
+            }
+        }
+        if (!missingIds.isEmpty()) {
+            throw new IllegalArgumentException("inspection record not found, ids=" + missingIds);
+        }
+
+        List<ExportFileResource> files = new ArrayList<>();
+        Set<String> usedEntryNames = new LinkedHashSet<>();
+        for (Long id : normalizedIds) {
+            InspectionRecord record = recordById.get(id);
+            Path exportPath = resolveExportFilePath(record);
+            if (!Files.exists(exportPath)) {
+                throw new IllegalStateException("inspection export file not found, id=" + id + ", path=" + exportPath);
+            }
+            String entryName = buildZipEntryName(id, exportPath.getFileName().toString(), usedEntryNames);
+            files.add(new ExportFileResource(id, entryName, exportPath));
+        }
+        return files;
+    }
+
+    private void deleteOneById(Long id) {
         if (id == null || id <= 0) {
             throw new IllegalArgumentException("inspection record id is invalid: " + id);
         }
@@ -221,6 +272,40 @@ public class InspectionLogSubmitExportService {
 
         deleteRelatedPhotoFiles(relatedFileIds);
         deleteExportFile(existingRecord);
+    }
+
+    private List<Long> normalizeRecordIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("inspection record ids are required");
+        }
+        Set<Long> uniqueIds = new LinkedHashSet<>();
+        for (Long id : ids) {
+            if (id == null || id <= 0) {
+                throw new IllegalArgumentException("inspection record id is invalid: " + id);
+            }
+            uniqueIds.add(id);
+        }
+        if (uniqueIds.isEmpty()) {
+            throw new IllegalArgumentException("inspection record ids are required");
+        }
+        return new ArrayList<>(uniqueIds);
+    }
+
+    private String buildZipEntryName(Long recordId, String originalFileName, Set<String> usedEntryNames) {
+        String normalizedFileName = normalizeExportFileName(originalFileName).replaceAll(INVALID_FILE_NAME_PATTERN, "_");
+        if (!StringUtils.hasText(normalizedFileName)) {
+            normalizedFileName = DEFAULT_EXPORT_FILE_NAME;
+        }
+        String candidate = recordId + "_" + normalizedFileName;
+        String candidateKey = candidate.toLowerCase(Locale.ROOT);
+        int suffix = 1;
+        while (usedEntryNames.contains(candidateKey)) {
+            candidate = recordId + "_" + suffix + "_" + normalizedFileName;
+            candidateKey = candidate.toLowerCase(Locale.ROOT);
+            suffix++;
+        }
+        usedEntryNames.add(candidateKey);
+        return candidate;
     }
 
     private Set<Long> collectFileIds(List<PhotoItem> photos) {
